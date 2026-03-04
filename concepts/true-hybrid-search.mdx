@@ -1,0 +1,555 @@
+---
+title: True Hybrid Search
+description: Combine multiple search techniques in a single query for optimal results
+---
+
+True hybrid search allows you to combine multiple search techniques—semantic search, vector search, keyword search, sparse vectors, and multi-vector search—in a single query. This enables you to leverage the strengths of each approach for superior search results.
+
+## Overview
+
+With true hybrid search, you can:
+- Combine semantic similarity with keyword matching
+- Blend vector search with BM25 scoring
+- Weight different search signals based on importance
+- Apply filters across all search types
+- Dynamically boost results based on conditions
+
+## Basic Hybrid Search
+
+Combine semantic search with keyword search:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { Client } from "topk-js";
+import { text, semanticIndex, keywordIndex } from "topk-js/schema";
+import { select, filter, field, fn, match } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+// Create collection with both semantic and keyword indexes
+await client.collections().create("books", {
+  title: text().index(semanticIndex()).index(keywordIndex()),
+  summary: text().index(keywordIndex())
+});
+
+// Hybrid query: semantic similarity + keyword matching
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    semantic_score: fn.semanticSimilarity("title", "classic literature"),
+    bm25_score: fn.bm25Score()
+  })
+  .filter(match("american", { field: "summary" }))
+  .topk(
+    field("semantic_score").mul(0.7).add(field("bm25_score").mul(0.3)),
+    10
+  )
+);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.schema import text, semantic_index, keyword_index
+from topk_sdk.query import select, filter, field, fn, match
+
+client = Client(
+  api_key="YOUR_API_KEY",
+  region="aws-us-east-1-elastica"
+)
+
+# Create collection with both semantic and keyword indexes
+client.collections().create("books", schema={
+  "title": text().index(semantic_index()).index(keyword_index()),
+  "summary": text().index(keyword_index())
+})
+
+# Hybrid query: semantic similarity + keyword matching
+results = client.collection("books").query(
+  select(
+    "title",
+    semantic_score=fn.semantic_similarity("title", "classic literature"),
+    bm25_score=fn.bm25_score()
+  )
+  .filter(match("american", "summary"))
+  .topk(
+    (field("semantic_score") * 0.7) + (field("bm25_score") * 0.3),
+    10
+  )
+)
+```
+
+</CodeGroup>
+
+<Tip>
+Experiment with different weight combinations to find the optimal balance for your use case. Start with equal weights (0.5/0.5) and adjust based on result quality.
+</Tip>
+
+## Vector + Keyword Hybrid
+
+Combine custom vector embeddings with BM25 scoring:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { f32Vector, vectorIndex, text, keywordIndex } from "topk-js/schema";
+import { select, filter, field, fn, match } from "topk-js/query";
+
+// Schema with vector and keyword indexes
+await client.collections().create("documents", {
+  title: text(),
+  content: text().index(keywordIndex()),
+  embedding: f32Vector({ dimension: 1536 }).index(
+    vectorIndex({ metric: "cosine" })
+  )
+});
+
+// Query combining vector similarity and keyword relevance
+const queryEmbedding = await generateEmbedding("machine learning");
+
+const results = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    vector_score: fn.vectorDistance("embedding", queryEmbedding),
+    keyword_score: fn.bm25Score()
+  })
+  .filter(
+    match("machine", { field: "content", weight: 30.0 }) |
+    match("learning", { field: "content", weight: 20.0 })
+  )
+  .topk(
+    // Invert vector distance and combine with BM25
+    field("vector_score").mul(-100).add(field("keyword_score")),
+    20
+  )
+);
+```
+
+```python Python
+from topk_sdk.schema import f32_vector, vector_index, text, keyword_index
+from topk_sdk.query import select, filter, field, fn, match
+
+# Schema with vector and keyword indexes
+client.collections().create("documents", schema={
+  "title": text(),
+  "content": text().index(keyword_index()),
+  "embedding": f32_vector(dimension=1536).index(
+    vector_index(metric="cosine")
+  )
+})
+
+# Query combining vector similarity and keyword relevance
+query_embedding = generate_embedding("machine learning")
+
+results = client.collection("documents").query(
+  select(
+    "title",
+    vector_score=fn.vector_distance("embedding", query_embedding),
+    keyword_score=fn.bm25_score()
+  )
+  .filter(
+    match("machine", "content", 30.0, False) |
+    match("learning", "content", 20.0, False)
+  )
+  .topk(
+    # Invert vector distance and combine with BM25
+    (field("vector_score") * -100) + field("keyword_score"),
+    20
+  )
+)
+```
+
+</CodeGroup>
+
+## Multiple Field Hybrid Search
+
+Search across multiple fields with different techniques:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, field, fn, match } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    title_semantic: fn.semanticSimilarity("title", "dystopian novel"),
+    summary_semantic: fn.semanticSimilarity("summary", "totalitarian society"),
+    keyword_score: fn.bm25Score()
+  })
+  .filter(
+    match("dystopian", { field: "title" }) |
+    match("totalitarian", { field: "summary" })
+  )
+  .topk(
+    field("title_semantic")
+      .add(field("summary_semantic"))
+      .add(field("keyword_score").mul(0.5)),
+    10
+  )
+);
+```
+
+```python Python
+from topk_sdk.query import select, filter, field, fn, match
+
+results = client.collection("books").query(
+  select(
+    "title",
+    title_semantic=fn.semantic_similarity("title", "dystopian novel"),
+    summary_semantic=fn.semantic_similarity("summary", "totalitarian society"),
+    keyword_score=fn.bm25_score()
+  )
+  .filter(
+    match("dystopian", "title") |
+    match("totalitarian", "summary")
+  )
+  .topk(
+    field("title_semantic") +
+    field("summary_semantic") +
+    (field("keyword_score") * 0.5),
+    10
+  )
+)
+```
+
+</CodeGroup>
+
+## Sparse + Dense Hybrid
+
+Combine sparse and dense vector search:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { f32Vector, f32SparseVector, vectorIndex } from "topk-js/schema";
+import { select, field, fn } from "topk-js/query";
+import { f32SparseVector as sparseVec } from "topk-js/data";
+
+// Schema with both dense and sparse vectors
+await client.collections().create("documents", {
+  dense_embedding: f32Vector({ dimension: 768 }).index(
+    vectorIndex({ metric: "cosine" })
+  ),
+  sparse_embedding: f32SparseVector().index(
+    vectorIndex({ metric: "dot_product" })
+  )
+});
+
+// Hybrid query with both vector types
+const denseQuery = await generateDenseEmbedding("machine learning");
+const sparseQuery = await generateSparseEmbedding("machine learning");
+
+const results = await client.collection("documents").query(
+  select({
+    dense_score: fn.vectorDistance("dense_embedding", denseQuery),
+    sparse_score: fn.vectorDistance("sparse_embedding", sparseVec(sparseQuery))
+  })
+  .topk(
+    field("dense_score").mul(-50).add(field("sparse_score")),
+    10
+  )
+);
+```
+
+```python Python
+from topk_sdk.schema import f32_vector, f32_sparse_vector, vector_index
+from topk_sdk.query import select, field, fn
+from topk_sdk.data import f32_sparse_vector
+
+# Schema with both dense and sparse vectors
+client.collections().create("documents", schema={
+  "dense_embedding": f32_vector(dimension=768).index(
+    vector_index(metric="cosine")
+  ),
+  "sparse_embedding": f32_sparse_vector().index(
+    vector_index(metric="dot_product")
+  )
+})
+
+# Hybrid query with both vector types
+dense_query = generate_dense_embedding("machine learning")
+sparse_query = generate_sparse_embedding("machine learning")
+
+results = client.collection("documents").query(
+  select(
+    dense_score=fn.vector_distance("dense_embedding", dense_query),
+    sparse_score=fn.vector_distance("sparse_embedding", f32_sparse_vector(sparse_query))
+  )
+  .topk(
+    (field("dense_score") * -50) + field("sparse_score"),
+    10
+  )
+)
+```
+
+</CodeGroup>
+
+## Conditional Boosting
+
+Dynamically boost results based on metadata or keyword matches:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.vectorDistance("embedding", queryEmbedding)
+  })
+  .topk(
+    // Boost by 10x if summary matches "racial injustice"
+    field("similarity").boost(
+      field("summary").matchAll("racial injustice"),
+      0.1  // multiply by 0.1 (distance is inverted)
+    ),
+    10,
+    true
+  )
+);
+
+// Equivalent using choose()
+const results2 = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.vectorDistance("embedding", queryEmbedding)
+  })
+  .topk(
+    field("similarity").mul(
+      field("summary").matchAll("racial injustice").choose(0.1, 1.0)
+    ),
+    10,
+    true
+  )
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    similarity=fn.vector_distance("embedding", query_embedding)
+  )
+  .topk(
+    # Boost by 10x if summary matches "racial injustice"
+    field("similarity").boost(
+      field("summary").match_all("racial injustice"),
+      0.1  # multiply by 0.1 (distance is inverted)
+    ),
+    10,
+    True
+  )
+)
+
+# Equivalent using choose()
+results2 = client.collection("books").query(
+  select(
+    "title",
+    similarity=fn.vector_distance("embedding", query_embedding)
+  )
+  .topk(
+    field("similarity") *
+    (field("summary").match_all("racial injustice").choose(0.1, 1.0)),
+    10,
+    True
+  )
+)
+```
+
+</CodeGroup>
+
+<Info>
+The `boost()` method is a convenience wrapper around `choose()`. Use it to multiply a score by a boost factor when a condition is true.
+</Info>
+
+## Handling Null Values
+
+Use `coalesce()` to provide default values for null fields:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    main_score: fn.vectorDistance("embedding", queryEmbedding),
+    backup_score: fn.vectorDistance("backup_embedding", queryEmbedding)
+  })
+  .topk(
+    field("main_score").add(
+      // Use backup_score only if it's not null, otherwise add 0
+      field("backup_score").coalesce(0.0)
+    ),
+    10,
+    true
+  )
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    main_score=fn.vector_distance("embedding", query_embedding),
+    backup_score=fn.vector_distance("backup_embedding", query_embedding)
+  )
+  .topk(
+    field("main_score") +
+    # Use backup_score only if it's not null, otherwise add 0
+    field("backup_score").coalesce(0.0),
+    10,
+    True
+  )
+)
+```
+
+</CodeGroup>
+
+## Multi-Stage Retrieval
+
+Combine hybrid search with reranking:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, field, fn, match } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    semantic_score: fn.semanticSimilarity("title", "dystopian fiction"),
+    keyword_score: fn.bm25Score()
+  })
+  .filter(match("dystopian", { field: "summary" }))
+  .topk(
+    field("semantic_score").add(field("keyword_score").mul(0.3)),
+    50  // Retrieve 50 candidates
+  )
+  .rerank({
+    model: "cohere/rerank-v4",
+    query: "best dystopian novels with social commentary",
+    fields: ["title", "summary"],
+    topkMultiple: 2  // Consider 100 documents (50 * 2)
+  })
+  .limit(10);  // Return top 10 after reranking
+```
+
+```python Python
+from topk_sdk.query import select, filter, field, fn, match
+
+results = client.collection("books").query(
+  select(
+    "title",
+    semantic_score=fn.semantic_similarity("title", "dystopian fiction"),
+    keyword_score=fn.bm25_score()
+  )
+  .filter(match("dystopian", "summary"))
+  .topk(
+    field("semantic_score") + (field("keyword_score") * 0.3),
+    50  # Retrieve 50 candidates
+  )
+  .rerank(
+    model="cohere/rerank-v4",
+    query="best dystopian novels with social commentary",
+    fields=["title", "summary"],
+    topk_multiple=2  # Consider 100 documents (50 * 2)
+  )
+  .limit(10)  # Return top 10 after reranking
+)
+```
+
+</CodeGroup>
+
+## Best Practices
+
+### Score Normalization
+
+Different search techniques produce scores on different scales:
+
+- **Vector distances**: Usually small values (0.0 to 2.0)
+- **BM25 scores**: Can be larger values (0 to 100+)
+- **Semantic similarity**: Model-dependent scale
+
+Normalize or weight scores appropriately:
+
+<CodeGroup>
+
+```javascript JavaScript
+// Multiply vector distance by 100 to match BM25 scale
+field("vector_distance").mul(-100).add(field("bm25_score"))
+
+// Or weight them differently
+field("vector_distance").mul(-50).add(field("bm25_score").mul(0.5))
+```
+
+```python Python
+# Multiply vector distance by 100 to match BM25 scale
+(field("vector_distance") * -100) + field("bm25_score")
+
+# Or weight them differently
+(field("vector_distance") * -50) + (field("bm25_score") * 0.5)
+```
+
+</CodeGroup>
+
+### Filter Before Scoring
+
+Apply filters early to reduce the search space:
+
+<CodeGroup>
+
+```javascript JavaScript
+// Good: Filter first
+const results = await client.collection("books").query(
+  select({ score: fn.vectorDistance("embedding", query) })
+    .filter(field("published_year").gte(2000))  // Filter first
+    .topk(field("score"), 10, true)
+);
+```
+
+```python Python
+# Good: Filter first
+results = client.collection("books").query(
+  select(score=fn.vector_distance("embedding", query))
+    .filter(field("published_year") >= 2000)  # Filter first
+    .topk(field("score"), 10, True)
+)
+```
+
+</CodeGroup>
+
+### Experiment with Weights
+
+Start with these baseline weight combinations:
+
+- **Semantic-heavy**: 0.7 semantic + 0.3 keyword
+- **Balanced**: 0.5 semantic + 0.5 keyword
+- **Keyword-heavy**: 0.3 semantic + 0.7 keyword
+
+Adjust based on your evaluation metrics.
+
+<Tip>
+Use offline evaluation with ground truth data to find optimal weight combinations for your specific use case.
+</Tip>
+
+<Warning>
+When combining distance metrics with scores, remember that lower distances mean more similar (inverse relationship). Multiply by -1 or use appropriate scaling when combining with similarity scores.
+</Warning>
+
+## Related Concepts
+
+- [Semantic Search](/concepts/semantic-search) - Natural language search
+- [Vector Search](/concepts/vector-search) - Custom embedding search
+- [Keyword Search](/concepts/keyword-search) - Term-based search
+- [Reranking](/concepts/reranking) - Improve hybrid results

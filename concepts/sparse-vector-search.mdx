@@ -1,0 +1,415 @@
+---
+title: Sparse Vector Search
+description: Efficient search using sparse vectors for high-dimensional data
+---
+
+Sparse vector search allows you to efficiently store and search vectors where most values are zero. This is ideal for learned sparse representations, TF-IDF vectors, or any high-dimensional vectors with sparse activations.
+
+## Overview
+
+With sparse vector search, you can:
+- Store only non-zero dimensions of vectors
+- Drastically reduce storage requirements for high-dimensional vectors
+- Use dot product similarity for efficient retrieval
+- Support both float32 and uint8 sparse vectors
+- Handle extremely high-dimensional spaces (up to 2^32 - 1 dimensions)
+
+## Schema Setup
+
+Define sparse vector fields without specifying a dimension:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { Client } from "topk-js";
+import { f32SparseVector, u8SparseVector, vectorIndex, text } from "topk-js/schema";
+
+const client = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+await client.collections().create("documents", {
+  title: text(),
+  // F32 sparse vector - good for learned sparse models
+  sparse_embedding_f32: f32SparseVector().index(
+    vectorIndex({ metric: "dot_product" })
+  ),
+  // U8 sparse vector - good for TF-IDF or count-based vectors
+  sparse_embedding_u8: u8SparseVector().index(
+    vectorIndex({ metric: "dot_product" })
+  )
+});
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.schema import (
+  f32_sparse_vector, u8_sparse_vector, vector_index, text
+)
+
+client = Client(
+  api_key="YOUR_API_KEY",
+  region="aws-us-east-1-elastica"
+)
+
+client.collections().create("documents", schema={
+  "title": text(),
+  # F32 sparse vector - good for learned sparse models
+  "sparse_embedding_f32": f32_sparse_vector().index(
+    vector_index(metric="dot_product")
+  ),
+  # U8 sparse vector - good for TF-IDF or count-based vectors
+  "sparse_embedding_u8": u8_sparse_vector().index(
+    vector_index(metric="dot_product")
+  )
+})
+```
+
+</CodeGroup>
+
+<Note>
+Sparse vectors use u32 dimension indices, supporting dictionaries of up to 2^32 - 1 terms. This makes them ideal for very large vocabularies.
+</Note>
+
+### Distance Metric
+
+Sparse vectors only support the `dot_product` metric:
+
+<Warning>
+Unlike dense vectors, sparse vectors only support `dot_product` as the distance metric. Attempting to use `cosine` or `euclidean` will result in an error.
+</Warning>
+
+## Inserting Documents with Sparse Vectors
+
+Provide sparse vectors as dictionaries mapping dimension indices to values:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { f32SparseVector, u8SparseVector } from "topk-js/data";
+
+await client.collection("documents").upsert([
+  {
+    _id: "doc1",
+    title: "Machine Learning Tutorial",
+    // F32 sparse vector: only non-zero dimensions
+    sparse_embedding_f32: f32SparseVector({
+      0: 0.12,
+      5: 0.67,
+      17: 0.82,
+      97: 0.53,
+      1024: 0.91
+    }),
+    // U8 sparse vector: integer values
+    sparse_embedding_u8: u8SparseVector({
+      0: 12,
+      5: 67,
+      17: 82,
+      97: 53,
+      1024: 91
+    })
+  },
+  {
+    _id: "doc2",
+    title: "Deep Learning Guide",
+    sparse_embedding_f32: f32SparseVector({
+      1: 0.45,
+      12: 0.89,
+      150: 0.34,
+      2048: 0.76
+    }),
+    sparse_embedding_u8: u8SparseVector({
+      1: 45,
+      12: 89,
+      150: 34,
+      2048: 76
+    })
+  }
+]);
+```
+
+```python Python
+from topk_sdk.data import f32_sparse_vector, u8_sparse_vector
+
+client.collection("documents").upsert([
+  {
+    "_id": "doc1",
+    "title": "Machine Learning Tutorial",
+    # F32 sparse vector: only non-zero dimensions
+    "sparse_embedding_f32": f32_sparse_vector({
+      0: 0.12,
+      5: 0.67,
+      17: 0.82,
+      97: 0.53,
+      1024: 0.91
+    }),
+    # U8 sparse vector: integer values
+    "sparse_embedding_u8": u8_sparse_vector({
+      0: 12,
+      5: 67,
+      17: 82,
+      97: 53,
+      1024: 91
+    })
+  },
+  {
+    "_id": "doc2",
+    "title": "Deep Learning Guide",
+    "sparse_embedding_f32": f32_sparse_vector({
+      1: 0.45,
+      12: 0.89,
+      150: 0.34,
+      2048: 0.76
+    }),
+    "sparse_embedding_u8": u8_sparse_vector({
+      1: 45,
+      12: 89,
+      150: 34,
+      2048: 76
+    })
+  }
+])
+```
+
+</CodeGroup>
+
+## Querying with Sparse Vectors
+
+Use `fn.vectorDistance()` with sparse query vectors:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+import { f32SparseVector } from "topk-js/data";
+
+// Query with F32 sparse vector
+const results1 = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    score: fn.vectorDistance(
+      "sparse_embedding_f32",
+      f32SparseVector({
+        0: 1.0,
+        5: 2.0,
+        17: 3.0
+      })
+    )
+  })
+  .topk(field("score"), 10, false)  // false for descending (highest score first)
+);
+
+// Query with U8 sparse vector
+const results2 = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    score: fn.vectorDistance(
+      "sparse_embedding_u8",
+      u8SparseVector({
+        0: 1,
+        5: 2,
+        17: 3
+      })
+    )
+  })
+  .topk(field("score"), 10, false)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+from topk_sdk.data import f32_sparse_vector, u8_sparse_vector
+
+# Query with F32 sparse vector
+results1 = client.collection("documents").query(
+  select(
+    "title",
+    score=fn.vector_distance(
+      "sparse_embedding_f32",
+      f32_sparse_vector({
+        0: 1.0,
+        5: 2.0,
+        17: 3.0
+      })
+    )
+  )
+  .topk(field("score"), 10, False)  # False for descending (highest score first)
+)
+
+# Query with U8 sparse vector
+results2 = client.collection("documents").query(
+  select(
+    "title",
+    score=fn.vector_distance(
+      "sparse_embedding_u8",
+      u8_sparse_vector({
+        0: 1,
+        5: 2,
+        17: 3
+      })
+    )
+  )
+  .topk(field("score"), 10, False)
+)
+```
+
+</CodeGroup>
+
+### Using Plain Dictionaries
+
+You can also pass plain dictionaries as query vectors:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+// Plain dictionary for query (inferred as f32)
+const results = await client.collection("documents").query(
+  select({
+    score: fn.vectorDistance(
+      "sparse_embedding_f32",
+      { 0: 1.0, 5: 2.0, 17: 3.0 }
+    )
+  })
+  .topk(field("score"), 10, false)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+# Plain dictionary for query
+results = client.collection("documents").query(
+  select(
+    score=fn.vector_distance(
+      "sparse_embedding_f32",
+      {0: 1.0, 5: 2.0, 17: 3.0}
+    )
+  )
+  .topk(field("score"), 10, False)
+)
+```
+
+</CodeGroup>
+
+## Combining with Filters
+
+Apply filters before sparse vector search:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, field, fn } from "topk-js/query";
+import { f32SparseVector } from "topk-js/data";
+
+const results = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    score: fn.vectorDistance(
+      "sparse_embedding_f32",
+      f32SparseVector({ 0: 1.0, 5: 2.0 })
+    )
+  })
+  .filter(field("category").eq("tutorials"))
+  .topk(field("score"), 10, false)
+);
+```
+
+```python Python
+from topk_sdk.query import select, filter, field, fn
+from topk_sdk.data import f32_sparse_vector
+
+results = client.collection("documents").query(
+  select(
+    "title",
+    score=fn.vector_distance(
+      "sparse_embedding_f32",
+      f32_sparse_vector({0: 1.0, 5: 2.0})
+    )
+  )
+  .filter(field("category") == "tutorials")
+  .topk(field("score"), 10, False)
+)
+```
+
+</CodeGroup>
+
+## Handling Nullable Sparse Vectors
+
+Sparse vector fields can be nullable (contain None/null values):
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+import { f32SparseVector } from "topk-js/data";
+
+const results = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    score: fn.vectorDistance(
+      "sparse_embedding_f32",
+      f32SparseVector({ 0: 1.0 })
+    )
+  })
+  // Documents with null sparse_embedding_f32 will be excluded
+  .topk(field("score"), 10, false)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+from topk_sdk.data import f32_sparse_vector
+
+results = client.collection("documents").query(
+  select(
+    "title",
+    score=fn.vector_distance(
+      "sparse_embedding_f32",
+      f32_sparse_vector({0: 1.0})
+    )
+  )
+  # Documents with null sparse_embedding_f32 will be excluded
+  .topk(field("score"), 10, False)
+)
+```
+
+</CodeGroup>
+
+<Info>
+Documents where the sparse vector field is null will automatically be excluded from results. Use the `coalesce()` method if you want to provide default scores for null values.
+</Info>
+
+## Use Cases
+
+Sparse vector search is ideal for:
+
+- **Learned sparse models**: SPLADE, SpladeV2, or other learned sparse representations
+- **TF-IDF vectors**: Classic information retrieval with term frequency vectors
+- **Count-based features**: Word counts, n-gram frequencies, or other count-based features
+- **High-dimensional spaces**: When vocabulary size is very large (millions of terms)
+- **Memory-efficient search**: When most vector dimensions are zero
+
+## Storage Efficiency
+
+Sparse vectors only store non-zero values, making them extremely efficient:
+
+- A 100,000-dimensional vector with 50 non-zero values only stores 50 values
+- Storage: `O(k)` where k is the number of non-zero dimensions
+- Query time: Proportional to the number of non-zero dimensions in both query and document vectors
+
+<Tip>
+Use `f32SparseVector` for models that produce continuous values (like SPLADE), and `u8SparseVector` for count-based or quantized sparse vectors.
+</Tip>
+
+<Warning>
+Ensure your sparse vector indices (keys in the dictionary) are valid u32 integers (0 to 2^32 - 1). Negative indices or indices exceeding this range will cause errors.
+</Warning>
+
+## Related Concepts
+
+- [Vector Search](/concepts/vector-search) - Dense vector search
+- [True Hybrid Search](/concepts/true-hybrid-search) - Combine sparse and dense vectors
+- [Keyword Search](/concepts/keyword-search) - Traditional text search

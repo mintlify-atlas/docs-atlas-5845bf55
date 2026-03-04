@@ -1,0 +1,182 @@
+---
+title: List Collections
+description: Retrieve all collections in the current project
+---
+
+Returns a list of all collections in the current project, including their schemas and metadata.
+
+## Method Signature
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    collections().list(): Promise<Array<Collection>>
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    collections().list() -> list[Collection]
+    ```
+  </Tab>
+</Tabs>
+
+## Parameters
+
+This method does not accept any parameters.
+
+## Returns
+
+<ResponseField name="Collections" type="Array<Collection>">
+  Returns an array of Collection objects, each containing metadata about a collection.
+  
+  <ResponseField name="name" type="string">
+    Name of the collection
+  </ResponseField>
+  
+  <ResponseField name="orgId" type="string">
+    Organization ID that owns the collection
+  </ResponseField>
+  
+  <ResponseField name="projectId" type="string">
+    Project ID that contains the collection
+  </ResponseField>
+  
+  <ResponseField name="schema" type="Record<string, CollectionFieldSpec>">
+    Schema definition for the collection fields
+  </ResponseField>
+  
+  <ResponseField name="region" type="string">
+    Region where the collection is stored
+  </ResponseField>
+</ResponseField>
+
+## Examples
+
+### List All Collections
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collections = await client.collections().list();
+
+    console.log(`Found ${collections.length} collections:`);
+    collections.forEach(collection => {
+      console.log(`- ${collection.name} (${collection.region})`);
+    });
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collections = client.collections().list()
+
+    print(f"Found {len(collections)} collections:")
+    for collection in collections:
+      print(f"- {collection.name} ({collection.region})")
+    ```
+  </Tab>
+</Tabs>
+
+### Inspect Collection Schemas
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collections = await client.collections().list();
+
+    for (const collection of collections) {
+      console.log(`\nCollection: ${collection.name}`);
+      console.log('Schema:');
+      
+      for (const [fieldName, fieldSpec] of Object.entries(collection.schema)) {
+        console.log(`  ${fieldName}: ${fieldSpec.dataType.type}`);
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collections = client.collections().list()
+
+    for collection in collections:
+      print(f"\nCollection: {collection.name}")
+      print("Schema:")
+      
+      for field_name, field_spec in collection.schema.items():
+        print(f"  {field_name}: {field_spec}")
+    ```
+  </Tab>
+</Tabs>
+
+### Filter Collections by Name Pattern
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collections = await client.collections().list();
+    const productCollections = collections.filter(c => 
+      c.name.startsWith("product_")
+    );
+
+    console.log(`Found ${productCollections.length} product collections`);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collections = client.collections().list()
+    product_collections = [
+      c for c in collections if c.name.startswith("product_")
+    ]
+
+    print(f"Found {len(product_collections)} product collections")
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  The list operation returns all collections in your project. If you have many collections, consider caching this result if you need to access it frequently.
+</Note>

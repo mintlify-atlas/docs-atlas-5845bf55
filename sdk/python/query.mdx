@@ -1,0 +1,793 @@
+---
+title: "Query"
+description: "Build powerful search queries with the TopK Python SDK"
+---
+
+The query module provides functions to build expressive search queries combining semantic similarity, keyword matching, and filters.
+
+## Overview
+
+TopK queries are built using a fluent API:
+
+```python
+from topk_sdk.query import select, field, filter, fn
+
+results = client.collection("books").query(
+    select(
+        "title", "year",
+        similarity=fn.semantic_similarity("title", "classic novel")
+    )
+    .filter(field("year") > 1900)
+    .topk(field("similarity"), 10)
+)
+```
+
+---
+
+## Query Stages
+
+### select()
+
+Create a query with a select stage. Specify which fields to return and compute additional expressions.
+
+```python
+from topk_sdk.query import select, field, fn
+
+# Select specific fields
+query = select("title", "author")
+
+# Select fields and compute expressions
+query = select(
+    "title",
+    year=field("published_year"),
+    similarity=fn.semantic_similarity("title", "animal")
+)
+```
+
+<ParamField path="*args" type="str">
+  Field names to include in the results.
+</ParamField>
+
+<ParamField path="**kwargs" type="LogicalExpr | FunctionExpr">
+  Named expressions to compute. The name becomes the field name in results.
+</ParamField>
+
+<ResponseField name="return" type="Query">
+  A new query with the select stage.
+</ResponseField>
+
+### filter()
+
+Create a query with a filter stage. Only documents matching the filter are returned.
+
+```python
+from topk_sdk.query import filter, field
+
+# Filter by field value
+query = filter(field("published_year") > 1980)
+
+# Combine filters
+query = filter(
+    (field("year") >= 1900) & (field("year") <= 2000)
+)
+```
+
+<ParamField path="expr" type="LogicalExpr | TextExpr" required>
+  The filter expression. Documents must satisfy this expression to be included.
+</ParamField>
+
+<ResponseField name="return" type="Query">
+  A new query with the filter stage.
+</ResponseField>
+
+### Query.filter()
+
+Add a filter stage to an existing query.
+
+```python
+query = select("title").filter(field("year") > 2000)
+```
+
+<ParamField path="expr" type="LogicalExpr | TextExpr" required>
+  The filter expression.
+</ParamField>
+
+<ResponseField name="return" type="Query">
+  The query with the filter stage added.
+</ResponseField>
+
+### Query.sort()
+
+Add a sort stage to sort results by an expression.
+
+```python
+from topk_sdk.query import select, field
+
+# Sort ascending (default)
+query = select("title", "year").sort(field("year"))
+
+# Sort descending
+query = select("title", "year").sort(field("year"), asc=False)
+```
+
+<ParamField path="expr" type="LogicalExpr" required>
+  The expression to sort by.
+</ParamField>
+
+<ParamField path="asc" type="bool" default="true">
+  Sort in ascending order if `True`, descending if `False`.
+</ParamField>
+
+<ResponseField name="return" type="Query">
+  The query with the sort stage added.
+</ResponseField>
+
+### Query.topk()
+
+Add a top-k stage to return the top k results by a scoring expression.
+
+```python
+from topk_sdk.query import select, field, fn
+
+query = select(
+    "title",
+    score=fn.semantic_similarity("title", "dystopian")
+).topk(field("score"), 10)
+```
+
+<ParamField path="expr" type="LogicalExpr" required>
+  The scoring expression. Results are ranked by this value.
+</ParamField>
+
+<ParamField path="k" type="int" required>
+  The number of top results to return.
+</ParamField>
+
+<ParamField path="asc" type="bool" default="false">
+  If `True`, return k results with lowest scores. If `False` (default), return highest scores.
+</ParamField>
+
+<ResponseField name="return" type="Query">
+  The query with the top-k stage added.
+</ResponseField>
+
+### Query.limit()
+
+Add a limit stage to restrict the number of results.
+
+```python
+query = select("title").limit(10)
+```
+
+<ParamField path="k" type="int" required>
+  The maximum number of results to return.
+</ParamField>
+
+<ResponseField name="return" type="Query">
+  The query with the limit stage added.
+</ResponseField>
+
+### Query.count()
+
+Add a count stage to return the count of matching documents instead of the documents themselves.
+
+```python
+count_query = filter(field("year") > 2000).count()
+```
+
+<ResponseField name="return" type="Query">
+  The query with the count stage added.
+</ResponseField>
+
+### Query.rerank()
+
+Add a rerank stage to re-score results using a reranking model.
+
+```python
+query = select("title", "description").rerank(
+    model="cohere/rerank-english-v3.0",
+    query="best science fiction books",
+    fields=["title", "description"],
+    topk_multiple=3
+)
+```
+
+<ParamField path="model" type="str">
+  The reranking model to use.
+</ParamField>
+
+<ParamField path="query" type="str">
+  The query text to rerank against.
+</ParamField>
+
+<ParamField path="fields" type="Sequence[str]" default="[]">
+  Fields to consider during reranking.
+</ParamField>
+
+<ParamField path="topk_multiple" type="int">
+  Retrieve this multiple of k candidates before reranking.
+</ParamField>
+
+<ResponseField name="return" type="Query">
+  The query with the rerank stage added.
+</ResponseField>
+
+---
+
+## Field References
+
+### field()
+
+Reference a field from the document.
+
+```python
+from topk_sdk.query import field
+
+# Use in filters
+filter(field("year") > 2000)
+
+# Use in select expressions
+select("title", publication_year=field("year"))
+
+# Use in topk
+select("title", score=fn.semantic_similarity("title", "novel"))
+    .topk(field("score"), 10)
+```
+
+<ParamField path="name" type="str" required>
+  The name of the field to reference.
+</ParamField>
+
+<ResponseField name="return" type="LogicalExpr">
+  An expression referencing the field.
+</ResponseField>
+
+### literal()
+
+Create a literal expression from a value.
+
+```python
+from topk_sdk.query import literal, field
+
+# Usually not needed, values are auto-converted
+filter(field("year").eq(literal(2000)))
+
+# This is equivalent:
+filter(field("year") == 2000)
+```
+
+<ParamField path="value" type="Any" required>
+  The literal value.
+</ParamField>
+
+<ResponseField name="return" type="LogicalExpr">
+  A literal expression.
+</ResponseField>
+
+---
+
+## Logical Expressions
+
+`LogicalExpr` objects support rich operations for building filters and computed fields.
+
+### Comparison Operators
+
+```python
+from topk_sdk.query import field
+
+# Equality
+field("genre").eq("fiction")      # or field("genre") == "fiction"
+field("genre").ne("non-fiction")  # or field("genre") != "non-fiction"
+
+# Ordering
+field("year").lt(2000)   # or field("year") < 2000
+field("year").lte(2000)  # or field("year") <= 2000
+field("year").gt(2000)   # or field("year") > 2000
+field("year").gte(2000)  # or field("year") >= 2000
+```
+
+### Arithmetic Operators
+
+```python
+from topk_sdk.query import field, select
+
+# Addition, subtraction, multiplication, division
+select(
+    "title",
+    discounted_price=field("price") * 0.8,
+    price_diff=field("price") - field("cost"),
+    total=field("price") + field("tax")
+)
+```
+
+### Logical Operators
+
+```python
+from topk_sdk.query import field, filter
+
+# AND
+filter(field("year").gt(1900) & field("year").lt(2000))
+
+# OR
+filter(field("genre").eq("fiction") | field("genre").eq("mystery"))
+```
+
+### String Operators
+
+```python
+from topk_sdk.query import field, filter
+
+# Check if string starts with prefix
+filter(field("title").starts_with("The"))
+
+# Check if list/string contains value
+filter(field("tags").contains("bestseller"))
+
+# Check if value is in list
+filter(field("genre").in_(["fiction", "mystery", "thriller"]))
+
+# Regular expression matching
+filter(field("title").regexp_match(r"^The.*", flags="i"))
+```
+
+### Keyword Matching
+
+```python
+from topk_sdk.query import field, filter
+
+# Match any term (OR)
+filter(field("title").match_any(["science", "fiction"]))
+
+# Match all terms (AND)
+filter(field("title").match_all(["science", "fiction"]))
+```
+
+### Null Handling
+
+```python
+from topk_sdk.query import field, filter
+
+# Check for null
+filter(field("description").is_null())
+filter(field("description").is_not_null())
+
+# Coalesce null values
+select("title", rating=field("rating").coalesce(0.0))
+```
+
+### Math Functions
+
+```python
+from topk_sdk.query import field, select
+
+select(
+    "title",
+    abs_diff=field("price").sub(field("cost")).abs(),
+    sqrt_price=field("price").sqrt(),
+    squared=field("rating").square(),
+    log_price=field("price").ln(),
+    exp_value=field("value").exp()
+)
+```
+
+### Conditional Expressions
+
+```python
+from topk_sdk.query import field, select
+
+# Choose between two values based on condition
+select(
+    "title",
+    status=field("in_stock").choose("Available", "Out of Stock")
+)
+
+# Boost scoring based on condition
+select(
+    "title",
+    score=fn.semantic_similarity("title", "novel").boost(
+        field("is_bestseller"),
+        2.0  # 2x boost for bestsellers
+    )
+)
+
+# Min/max
+select(
+    "title",
+    min_value=field("price").min(field("msrp")),
+    max_value=field("rating").max(4.5)
+)
+```
+
+---
+
+## Keyword Search
+
+### match()
+
+Perform keyword search for documents containing specific keywords or phrases. Use with fields that have a `keyword_index()`.
+
+```python
+from topk_sdk.query import match, filter, select, fn
+
+# Simple keyword match
+query = filter(match("science"))
+
+# Match on specific field
+query = filter(match("fiction", field="genre"))
+
+# Match with weight
+query = filter(match("bestseller", weight=2.0))
+
+# Match all terms (AND)
+query = filter(match("science fiction", all=True))
+
+# Combine with BM25 scoring
+query = select(
+    "title",
+    text_score=fn.bm25_score()
+).filter(
+    match("dystopian") | match("future")
+).topk(field("text_score"), 10)
+```
+
+<ParamField path="token" type="str" required>
+  The keyword or phrase to search for.
+</ParamField>
+
+<ParamField path="field" type="str">
+  The specific field to search in. If not provided, searches all keyword-indexed fields.
+</ParamField>
+
+<ParamField path="weight" type="float" default="1.0">
+  Weight for this term in scoring.
+</ParamField>
+
+<ParamField path="all" type="bool" default="false">
+  If `True`, all tokens must match (AND). If `False`, any token can match (OR).
+</ParamField>
+
+<ResponseField name="return" type="LogicalExpr">
+  A keyword match expression.
+</ResponseField>
+
+---
+
+## Logical Combinators
+
+### all()
+
+Create a logical AND expression combining multiple conditions.
+
+```python
+from topk_sdk.query import field, all, filter
+
+query = filter(all([
+    field("published_year") >= 1900,
+    field("published_year") <= 2000,
+    field("title").is_not_null()
+]))
+```
+
+<ParamField path="exprs" type="Sequence[LogicalExpr]" required>
+  List of expressions to combine with AND.
+</ParamField>
+
+<ResponseField name="return" type="LogicalExpr">
+  A logical AND expression.
+</ResponseField>
+
+### any()
+
+Create a logical OR expression combining multiple conditions.
+
+```python
+from topk_sdk.query import field, any, filter
+
+query = filter(any([
+    field("genre") == "fiction",
+    field("genre") == "mystery",
+    field("genre") == "thriller"
+]))
+```
+
+<ParamField path="exprs" type="Sequence[LogicalExpr]" required>
+  List of expressions to combine with OR.
+</ParamField>
+
+<ResponseField name="return" type="LogicalExpr">
+  A logical OR expression.
+</ResponseField>
+
+### not_()
+
+Negate a logical expression.
+
+```python
+from topk_sdk.query import field, not_, filter
+
+query = filter(not_(field("title").contains("Catcher")))
+```
+
+<ParamField path="expr" type="LogicalExpr" required>
+  The expression to negate.
+</ParamField>
+
+<ResponseField name="return" type="LogicalExpr">
+  The negated expression.
+</ResponseField>
+
+---
+
+## Function Expressions
+
+The `fn` class provides functions for semantic similarity, vector distance, and keyword scoring.
+
+### fn.semantic_similarity()
+
+Calculate semantic similarity between a field and a query string. Requires a `semantic_index()` on the field.
+
+```python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+    select(
+        "title",
+        similarity=fn.semantic_similarity("title", "animal story")
+    ).topk(field("similarity"), 10)
+)
+```
+
+<ParamField path="field" type="str" required>
+  The field name with a semantic index.
+</ParamField>
+
+<ParamField path="query" type="str" required>
+  The query text to compare against.
+</ParamField>
+
+<ResponseField name="return" type="FunctionExpr">
+  A semantic similarity scoring function.
+</ResponseField>
+
+### fn.vector_distance()
+
+Calculate vector distance between a field and a query vector. Requires a `vector_index()` on the field.
+
+```python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+    select(
+        "title",
+        distance=fn.vector_distance(
+            "title_embedding",
+            [0.1, 0.2, 0.3, ...]  # Your embedding vector
+        )
+    ).topk(field("distance"), 10)
+)
+```
+
+<ParamField path="field" type="str" required>
+  The field name containing vectors with a vector index.
+</ParamField>
+
+<ParamField path="vector" type="list[int] | list[float] | dict[int, float] | dict[int, int] | SparseVector | List" required>
+  The query vector. Can be:
+  - Dense vector: `[0.1, 0.2, 0.3, ...]`
+  - Sparse vector: `{0: 0.5, 10: 0.8, 50: 0.3}`
+  - `SparseVector` or `List` instance from `topk_sdk.data`
+</ParamField>
+
+<ParamField path="skip_refine" type="bool" default="false">
+  Skip the refinement step for approximate search.
+</ParamField>
+
+<ResponseField name="return" type="FunctionExpr">
+  A vector distance scoring function.
+</ResponseField>
+
+### fn.multi_vector_distance()
+
+Calculate multi-vector distance between a matrix field and a query matrix. Requires a `multi_vector_index()` on the field.
+
+```python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("documents").query(
+    select(
+        "title",
+        distance=fn.multi_vector_distance(
+            "colbert_embeddings",
+            [[0.1, 0.2, ...], [0.3, 0.4, ...], ...],
+            candidates=100
+        )
+    ).topk(field("distance"), 10)
+)
+```
+
+<ParamField path="field" type="str" required>
+  The field name containing matrices with a multi-vector index.
+</ParamField>
+
+<ParamField path="matrix" type="Matrix | ndarray | list[list[float]] | list[list[int]]" required>
+  The query matrix. Can be:
+  - List of lists: `[[0.1, 0.2], [0.3, 0.4]]`
+  - Numpy array: `np.array([[0.1, 0.2], [0.3, 0.4]])`
+  - `Matrix` instance from `topk_sdk.data`
+</ParamField>
+
+<ParamField path="candidates" type="int">
+  Limit the number of candidate vectors considered during search.
+</ParamField>
+
+<ResponseField name="return" type="FunctionExpr">
+  A multi-vector distance scoring function.
+</ResponseField>
+
+### fn.bm25_score()
+
+Calculate BM25 score for keyword search. Use with `match()` filters.
+
+```python
+from topk_sdk.query import select, field, fn, match
+
+results = client.collection("books").query(
+    select(
+        "title",
+        text_score=fn.bm25_score()
+    )
+    .filter(match("dystopian") | match("future"))
+    .topk(field("text_score"), 10)
+)
+```
+
+<ResponseField name="return" type="FunctionExpr">
+  A BM25 scoring function.
+</ResponseField>
+
+---
+
+## Helper Functions
+
+### min()
+
+Compute the minimum of two expressions.
+
+```python
+from topk_sdk.query import field, min, select
+
+query = select(
+    "title",
+    best_price=min(field("price"), field("sale_price"))
+)
+```
+
+<ParamField path="left" type="int | float | str | LogicalExpr" required>
+  First value to compare.
+</ParamField>
+
+<ParamField path="right" type="int | float | str | LogicalExpr" required>
+  Second value to compare.
+</ParamField>
+
+<ResponseField name="return" type="LogicalExpr">
+  The minimum value.
+</ResponseField>
+
+### max()
+
+Compute the maximum of two expressions.
+
+```python
+from topk_sdk.query import field, max, select
+
+query = select(
+    "title",
+    max_rating=max(field("user_rating"), field("critic_rating"))
+)
+```
+
+<ParamField path="left" type="int | float | str | LogicalExpr" required>
+  First value to compare.
+</ParamField>
+
+<ParamField path="right" type="int | float | str | LogicalExpr" required>
+  Second value to compare.
+</ParamField>
+
+<ResponseField name="return" type="LogicalExpr">
+  The maximum value.
+</ResponseField>
+
+### abs()
+
+Compute the absolute value of an expression.
+
+```python
+from topk_sdk.query import field, abs, filter
+
+query = filter(abs(field("temperature")) > 30)
+```
+
+<ParamField path="expr" type="LogicalExpr" required>
+  The expression to compute the absolute value of.
+</ParamField>
+
+<ResponseField name="return" type="LogicalExpr">
+  The absolute value.
+</ResponseField>
+
+---
+
+## Complete Examples
+
+### Semantic Search
+
+```python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+    select(
+        "title", "author", "year",
+        similarity=fn.semantic_similarity("title", "space exploration")
+    )
+    .filter(field("year") > 1950)
+    .topk(field("similarity"), 10)
+)
+```
+
+### Hybrid Search (Semantic + Keyword)
+
+```python
+from topk_sdk.query import select, field, fn, match
+
+results = client.collection("books").query(
+    select(
+        "title",
+        semantic_score=fn.semantic_similarity("title", "artificial intelligence"),
+        keyword_score=fn.bm25_score(),
+        hybrid_score=fn.semantic_similarity("title", "AI") + fn.bm25_score()
+    )
+    .filter(match("technology") | match("computer"))
+    .topk(field("hybrid_score"), 10)
+)
+```
+
+### Vector Search with Filters
+
+```python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("products").query(
+    select(
+        "name", "price", "category",
+        similarity=fn.vector_distance("image_embedding", user_query_vector)
+    )
+    .filter(
+        (field("price") < 100) & 
+        (field("in_stock") == True) &
+        field("category").in_(["electronics", "gadgets"])
+    )
+    .topk(field("similarity"), 20)
+)
+```
+
+### Multi-Vector Search (ColBERT)
+
+```python
+from topk_sdk.query import select, field, fn
+import numpy as np
+
+query_matrix = np.random.rand(10, 128).astype(np.float32)
+
+results = client.collection("documents").query(
+    select(
+        "title", "content",
+        relevance=fn.multi_vector_distance(
+            "colbert_embeddings",
+            query_matrix,
+            candidates=500
+        )
+    ).topk(field("relevance"), 10)
+)
+```

@@ -1,0 +1,238 @@
+---
+title: Get Collection
+description: Retrieve information about a specific collection
+---
+
+Retrieves detailed information about a specific collection, including its schema and metadata.
+
+## Method Signature
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    collections().get(name: string): Promise<Collection>
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    collections().get(collection_name: str) -> Collection
+    ```
+  </Tab>
+</Tabs>
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  The name of the collection to retrieve.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Collection" type="object">
+  Returns a Collection object containing metadata about the collection.
+  
+  <ResponseField name="name" type="string">
+    Name of the collection
+  </ResponseField>
+  
+  <ResponseField name="orgId" type="string">
+    Organization ID that owns the collection
+  </ResponseField>
+  
+  <ResponseField name="projectId" type="string">
+    Project ID that contains the collection
+  </ResponseField>
+  
+  <ResponseField name="schema" type="Record<string, CollectionFieldSpec>">
+    Schema definition for the collection fields, including data types, required status, and index configurations
+  </ResponseField>
+  
+  <ResponseField name="region" type="string">
+    Region where the collection is stored
+  </ResponseField>
+</ResponseField>
+
+## Examples
+
+### Get Collection Information
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collection = await client.collections().get("books");
+
+    console.log(`Collection: ${collection.name}`);
+    console.log(`Region: ${collection.region}`);
+    console.log(`Project: ${collection.projectId}`);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collection = client.collections().get("books")
+
+    print(f"Collection: {collection.name}")
+    print(f"Region: {collection.region}")
+    print(f"Project: {collection.project_id}")
+    ```
+  </Tab>
+</Tabs>
+
+### Inspect Collection Schema
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collection = await client.collections().get("books");
+
+    console.log(`Schema for ${collection.name}:`);
+    for (const [fieldName, fieldSpec] of Object.entries(collection.schema)) {
+      const required = fieldSpec.required ? " (required)" : "";
+      const indexed = fieldSpec.index ? " [indexed]" : "";
+      console.log(`  ${fieldName}: ${fieldSpec.dataType.type}${required}${indexed}`);
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collection = client.collections().get("books")
+
+    print(f"Schema for {collection.name}:")
+    for field_name, field_spec in collection.schema.items():
+      required = " (required)" if field_spec.required else ""
+      indexed = " [indexed]" if hasattr(field_spec, 'index') and field_spec.index else ""
+      print(f"  {field_name}: {field_spec}{required}{indexed}")
+    ```
+  </Tab>
+</Tabs>
+
+### Verify Collection Exists
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    async function collectionExists(name) {
+      try {
+        await client.collections().get(name);
+        return true;
+      } catch (error) {
+        if (error.message.includes("not found")) {
+          return false;
+        }
+        throw error;
+      }
+    }
+
+    const exists = await collectionExists("books");
+    console.log(`Collection exists: ${exists}`);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    def collection_exists(name: str) -> bool:
+      try:
+        client.collections().get(name)
+        return True
+      except Exception as error:
+        if "not found" in str(error):
+          return False
+        raise
+
+    exists = collection_exists("books")
+    print(f"Collection exists: {exists}")
+    ```
+  </Tab>
+</Tabs>
+
+### Check for Vector Index
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collection = await client.collections().get("products");
+
+    const vectorFields = Object.entries(collection.schema)
+      .filter(([_, spec]) => 
+        spec.index && spec.index.type === "VectorIndex"
+      )
+      .map(([name, _]) => name);
+
+    console.log(`Vector indexed fields: ${vectorFields.join(", ")}`);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collection = client.collections().get("products")
+
+    vector_fields = [
+      name for name, spec in collection.schema.items()
+      if hasattr(spec, 'index') and spec.index
+    ]
+
+    print(f"Vector indexed fields: {', '.join(vector_fields)}")
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  If the collection does not exist, this method will throw an error. Use try-catch (JavaScript) or try-except (Python) to handle this case gracefully.
+</Note>

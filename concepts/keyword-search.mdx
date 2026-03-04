@@ -1,0 +1,443 @@
+---
+title: Keyword Search
+description: Full-text search with BM25 scoring and boolean matching
+---
+
+Keyword search enables full-text search on text fields using BM25 scoring and boolean term matching. Unlike semantic search which finds conceptually similar content, keyword search finds exact term matches with relevance ranking.
+
+## Overview
+
+With keyword search, you can:
+- Search for exact terms and phrases in text fields
+- Use BM25 scoring for relevance ranking
+- Combine multiple search terms with AND/OR logic
+- Weight terms differently for custom relevance
+- Filter results using match operations
+
+## Schema Setup
+
+To enable keyword search on a field, add a `keywordIndex()` to a text field:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { Client } from "topk-js";
+import { text, keywordIndex } from "topk-js/schema";
+
+const client = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+await client.collections().create("books", {
+  title: text().index(keywordIndex()),
+  summary: text().required().index(keywordIndex())
+});
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.schema import text, keyword_index
+
+client = Client(
+  api_key="YOUR_API_KEY",
+  region="aws-us-east-1-elastica"
+)
+
+client.collections().create("books", schema={
+  "title": text().index(keyword_index()),
+  "summary": text().required().index(keyword_index())
+})
+```
+
+</CodeGroup>
+
+## Inserting Documents
+
+Insert documents with text content:
+
+<CodeGroup>
+
+```javascript JavaScript
+await client.collection("books").upsert([
+  {
+    _id: "gatsby",
+    title: "The Great Gatsby",
+    summary: "A story about love and the American Dream in the Jazz Age"
+  },
+  {
+    _id: "mockingbird",
+    title: "To Kill a Mockingbird",
+    summary: "A novel about racial injustice and moral growth in the American South"
+  },
+  {
+    _id: "1984",
+    title: "1984",
+    summary: "A dystopian story about totalitarian surveillance and control"
+  }
+]);
+```
+
+```python Python
+client.collection("books").upsert([
+  {
+    "_id": "gatsby",
+    "title": "The Great Gatsby",
+    "summary": "A story about love and the American Dream in the Jazz Age"
+  },
+  {
+    "_id": "mockingbird",
+    "title": "To Kill a Mockingbird",
+    "summary": "A novel about racial injustice and moral growth in the American South"
+  },
+  {
+    "_id": "1984",
+    "title": "1984",
+    "summary": "A dystopian story about totalitarian surveillance and control"
+  }
+])
+```
+
+</CodeGroup>
+
+## Searching with match()
+
+Use `match()` to filter documents by keyword:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { filter, match, field } from "topk-js/query";
+
+// Match a single term
+const results = await client.collection("books").query(
+  filter(match("love", { field: "summary" }))
+    .topk(field("published_year"), 10, true)
+);
+```
+
+```python Python
+from topk_sdk.query import filter, match, field
+
+# Match a single term
+results = client.collection("books").query(
+  filter(match("love", "summary"))
+    .topk(field("published_year"), 10, True)
+)
+```
+
+</CodeGroup>
+
+### Match Options
+
+Customize matching behavior:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { filter, match } from "topk-js/query";
+
+// Match with options
+const results = await client.collection("books").query(
+  filter(
+    match("american dream", {
+      field: "summary",
+      weight: 2.0,  // Boost this term's importance
+      all: false    // Match ANY word (OR logic)
+    })
+  )
+);
+```
+
+```python Python
+from topk_sdk.query import filter, match
+
+# Match with options
+results = client.collection("books").query(
+  filter(
+    match(
+      "american dream",
+      field="summary",
+      weight=2.0,  # Boost this term's importance
+      all=False    # Match ANY word (OR logic)
+    )
+  )
+)
+```
+
+</CodeGroup>
+
+### Combining Matches
+
+Use boolean operators to combine multiple matches:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { filter, match } from "topk-js/query";
+
+// OR: Match documents containing either term
+const results1 = await client.collection("books").query(
+  filter(
+    match("love", { field: "summary" })
+      .or(match("totalitarian", { field: "summary" }))
+  )
+);
+
+// AND: Match documents containing both terms
+const results2 = await client.collection("books").query(
+  filter(
+    match("racial", { field: "summary" })
+      .and(match("injustice", { field: "summary" }))
+  )
+);
+
+// Using operators
+const results3 = await client.collection("books").query(
+  filter(
+    match("love", { field: "summary" }) | match("dream", { field: "title" })
+  )
+);
+```
+
+```python Python
+from topk_sdk.query import filter, match
+
+# OR: Match documents containing either term
+results1 = client.collection("books").query(
+  filter(
+    match("love", "summary") | match("totalitarian", "summary")
+  )
+)
+
+# AND: Match documents containing both terms
+results2 = client.collection("books").query(
+  filter(
+    match("racial", "summary") & match("injustice", "summary")
+  )
+)
+```
+
+</CodeGroup>
+
+<Warning>
+Use `|` and `&` operators (not `or` and `and` keywords) when combining match expressions.
+</Warning>
+
+## BM25 Scoring
+
+Use `fn.bm25Score()` to rank results by relevance:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, match, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    score: fn.bm25Score()
+  })
+  .filter(match("american", { field: "summary" }))
+  .topk(field("score"), 10)
+);
+```
+
+```python Python
+from topk_sdk.query import select, filter, match, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    score=fn.bm25_score()
+  )
+  .filter(match("american", "summary"))
+  .topk(field("score"), 10)
+)
+```
+
+</CodeGroup>
+
+<Note>
+`fn.bm25Score()` can only be used when there is at least one `match()` expression in the filter. It computes relevance based on term frequency and document frequency.
+</Note>
+
+### Weighted Term Matching
+
+Boost specific terms for custom relevance:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, match, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    score: fn.bm25Score()
+  })
+  .filter(
+    match("love", { weight: 30.0 }) |
+    match("young", { weight: 10.0 })
+  )
+  .topk(field("score"), 10)
+);
+```
+
+```python Python
+from topk_sdk.query import select, filter, match, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    score=fn.bm25_score()
+  )
+  .filter(
+    match("love", None, 30.0, False) |
+    match("young", None, 10.0, False)
+  )
+  .topk(field("score"), 10)
+)
+```
+
+</CodeGroup>
+
+## Field Methods for Matching
+
+Use field methods for more expressive matching:
+
+### matchAny() and matchAll()
+
+<CodeGroup>
+
+```javascript JavaScript
+import { filter, field } from "topk-js/query";
+
+// Match any of the terms (OR logic)
+const results1 = await client.collection("books").query(
+  filter(
+    field("summary").matchAny("love dream")
+  )
+);
+
+// Match all terms (AND logic)
+const results2 = await client.collection("books").query(
+  filter(
+    field("summary").matchAll("racial injustice")
+  )
+);
+
+// Match with tokenized arrays
+const results3 = await client.collection("books").query(
+  filter(
+    field("tags").matchAny(["fiction", "classic", "dystopian"])
+  )
+);
+```
+
+```python Python
+from topk_sdk.query import filter, field
+
+# Match any of the terms (OR logic)
+results1 = client.collection("books").query(
+  filter(
+    field("summary").match_any("love dream")
+  )
+)
+
+# Match all terms (AND logic)
+results2 = client.collection("books").query(
+  filter(
+    field("summary").match_all("racial injustice")
+  )
+)
+
+# Match with tokenized arrays
+results3 = client.collection("books").query(
+  filter(
+    field("tags").match_any(["fiction", "classic", "dystopian"])
+  )
+)
+```
+
+</CodeGroup>
+
+### Combining with Other Filters
+
+<CodeGroup>
+
+```javascript JavaScript
+import { filter, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(
+    field("summary").matchAll("love class")
+      .or(field("published_year").eq(1925))
+  )
+  .topk(field("published_year"), 10, true)
+);
+```
+
+```python Python
+from topk_sdk.query import filter, field
+
+results = client.collection("books").query(
+  filter(
+    (field("summary").match_all("love class")) |
+    (field("published_year") == 1925)
+  )
+  .topk(field("published_year"), 10, True)
+)
+```
+
+</CodeGroup>
+
+## Stop Words
+
+Common stop words (like "the", "a", "an") are automatically filtered out:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { filter, match } from "topk-js/query";
+
+// This will return no results because "the" is a stop word
+const results = await client.collection("books").query(
+  filter(match("the", { field: "summary" }))
+);
+```
+
+```python Python
+from topk_sdk.query import filter, match
+
+# This will return no results because "the" is a stop word
+results = client.collection("books").query(
+  filter(match("the", "summary"))
+)
+```
+
+</CodeGroup>
+
+## Use Cases
+
+Keyword search is ideal for:
+
+- **Exact term matching**: Find documents containing specific words or phrases
+- **Boolean search**: Combine multiple terms with AND/OR logic
+- **Document filtering**: Pre-filter documents before applying other search techniques
+- **Faceted search**: Filter by categories or tags using keyword matching
+- **Traditional search UIs**: Support familiar keyword-based search experiences
+
+<Tip>
+For best results with BM25 scoring, use multiple search terms and combine them with appropriate weights to reflect their importance.
+</Tip>
+
+<Info>
+Keyword search is case-insensitive and automatically tokenizes search queries, so "LOVE" and "love" are treated identically.
+</Info>
+
+## Related Concepts
+
+- [True Hybrid Search](/concepts/true-hybrid-search) - Combine keyword and vector search
+- [Semantic Search](/concepts/semantic-search) - Find conceptually similar content
+- [Reranking](/concepts/reranking) - Improve keyword search results with reranking

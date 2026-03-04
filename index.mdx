@@ -1,97 +1,247 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "TopK Documentation"
+description: "High-performance search for the AI era"
+mode: "custom"
 ---
 
-## Setting up
+<div className="relative overflow-hidden dark:bg-[#0f1117] bg-white py-20 border-b dark:border-[#27272a] border-gray-200">
+  <div className="max-w-7xl mx-auto px-6">
+    <div className="text-center">
+      <h1 className="text-5xl md:text-6xl font-bold dark:text-gray-100 text-gray-900 mb-6">
+        Search Engine for the AI Era
+      </h1>
+      <p className="text-lg md:text-xl dark:text-gray-400 text-gray-600 max-w-3xl mx-auto mb-10">
+        Combine keyword, semantic, and vector search in a single query. TopK delivers the most relevant results with record-low latency.
+      </p>
+      <div className="flex flex-wrap gap-4 justify-center">
+        <a 
+          href="/quickstart" 
+          className="inline-flex items-center px-8 py-3 rounded-lg text-white font-semibold transition-colors no-underline"
+          style={{backgroundColor: '#f04e04'}}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#d94404'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f04e04'}
+        >
+          Get Started
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </a>
+        <a 
+          href="/installation" 
+          className="inline-flex items-center px-8 py-3 rounded-lg dark:bg-white/10 bg-gray-100 dark:text-white text-gray-900 font-semibold dark:border-white/30 border-gray-300 border transition-all no-underline dark:hover:bg-white/20 hover:bg-gray-200"
+        >
+          Installation Guide
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold dark:text-white text-gray-900 mb-3">Quick Start</h2>
+  <p className="dark:text-gray-400 text-gray-600 mb-8">Get up and running with TopK in minutes</p>
+  
+  <Steps>
+    <Step title="Install the SDK">
+      Choose your preferred language and install the TopK SDK:
+      
+      <CodeGroup>
+      ```bash npm
+      npm install topk-js
+      ```
+      ```bash yarn
+      yarn add topk-js
+      ```
+      ```bash pip
+      pip install topk-sdk
+      ```
+      </CodeGroup>
+    </Step>
+    
+    <Step title="Get your API key">
+      Sign up at [console.topk.io](https://console.topk.io) and generate your API key. Initialize the client:
+      
+      <Tabs>
+        <Tab title="JavaScript">
+        ```javascript
+        import { Client } from "topk-js"
+        
+        const client = new Client({
+          apiKey: "YOUR_TOPK_API_KEY",
+          region: "aws-us-east-1-elastica"
+        });
+        ```
+        </Tab>
+        <Tab title="Python">
+        ```python
+        from topk_sdk import Client
+        
+        client = Client(
+          api_key="YOUR_TOPK_API_KEY",
+          region="aws-us-east-1-elastica"
+        )
+        ```
+        </Tab>
+      </Tabs>
+    </Step>
+    
+    <Step title="Create your first collection">
+      Define a schema and create a collection with semantic search enabled:
+      
+      <Tabs>
+        <Tab title="JavaScript">
+        ```javascript
+        import { text, semanticIndex } from "topk-js/schema"
+        
+        await client.collections().create("books", {
+          title: text().required().index(semanticIndex()),
+        });
+        ```
+        </Tab>
+        <Tab title="Python">
+        ```python
+        from topk_sdk.schema import text, semantic_index
+        
+        client.collections().create(
+          "books",
+          schema={
+            "title": text().required().index(semantic_index()),
+          }
+        )
+        ```
+        </Tab>
+      </Tabs>
+    </Step>
+    
+    <Step title="Run your first search">
+      Add documents and perform a semantic search:
+      
+      <Tabs>
+        <Tab title="JavaScript">
+        ```javascript
+        import { select, fn, field } from "topk-js/query"
+        
+        // Add documents
+        await client.collection("books").upsert([
+          { _id: "gatsby", title: "The Great Gatsby" },
+          { _id: "1984", title: "1984" },
+        ]);
+        
+        // Search with semantic similarity
+        const results = await client.collection("books").query(
+          select({
+            title: field("title"),
+            similarity: fn.semanticSimilarity("title", "classic American novel"),
+          }).topk(field("similarity"), 10)
+        );
+        ```
+        </Tab>
+        <Tab title="Python">
+        ```python
+        from topk_sdk.query import select, field, fn
+        
+        # Add documents
+        client.collection("books").upsert([
+          {"_id": "gatsby", "title": "The Great Gatsby"},
+          {"_id": "1984", "title": "1984"},
+        ])
+        
+        # Search with semantic similarity
+        results = client.collection("books").query(
+          select(
+            "title",
+            similarity=fn.semantic_similarity("title", "classic American novel")
+          ).topk(field("similarity"), 10)
+        )
+        ```
+        </Tab>
+      </Tabs>
+    </Step>
+  </Steps>
+</div>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold dark:text-white text-gray-900 mb-3">Key Features</h2>
+  <p className="dark:text-gray-400 text-gray-600 mb-8">Everything you need for modern search experiences</p>
+  
+  <CardGroup cols={2}>
+    <Card title="Semantic Search" icon="brain" href="/concepts/semantic-search">
+      Automatic embeddings and similarity search without managing vector models
+    </Card>
+    <Card title="Vector Search" icon="vector-square" href="/concepts/vector-search">
+      Bring your own embeddings with support for multiple vector types and dimensions
+    </Card>
+    <Card title="Keyword Search" icon="text" href="/concepts/keyword-search">
+      BM25 full-text search with relevance scoring and filtering
+    </Card>
+    <Card title="True Hybrid Search" icon="wand-magic-sparkles" href="/concepts/true-hybrid-search">
+      Combine multiple search techniques in a single query for optimal results
+    </Card>
+    <Card title="Multi-Vector Search" icon="bezier-curve" href="/concepts/multi-vector-search">
+      Search across multiple vector representations simultaneously
+    </Card>
+    <Card title="Reranking" icon="arrow-up-arrow-down" href="/concepts/reranking">
+      Built-in reranking to improve result quality
+    </Card>
+  </CardGroup>
+</div>
 
-## Make it yours
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold dark:text-white text-gray-900 mb-3">Explore the APIs</h2>
+  <p className="dark:text-gray-400 text-gray-600 mb-8">Comprehensive documentation for all TopK operations</p>
+  
+  <CardGroup cols={3}>
+    <Card title="Collections API" icon="folder" href="/collections/create">
+      Create and manage collections with custom schemas
+    </Card>
+    <Card title="Documents API" icon="file" href="/documents/upsert">
+      Upsert, query, update, and delete documents
+    </Card>
+    <Card title="Query API" icon="magnifying-glass" href="/documents/query">
+      Powerful query language with filtering and ranking
+    </Card>
+  </CardGroup>
+</div>
 
-Design a docs site that looks great and empowers your users.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold dark:text-white text-gray-900 mb-3">SDK Reference</h2>
+  <p className="dark:text-gray-400 text-gray-600 mb-8">Complete API documentation for Python and JavaScript SDKs</p>
+  
+  <CardGroup cols={2}>
+    <Card title="Python SDK" icon="python" href="/sdk/python/client">
+      Complete reference for the TopK Python SDK
+    </Card>
+    <Card title="JavaScript SDK" icon="js" href="/sdk/javascript/client">
+      Complete reference for the TopK JavaScript SDK
+    </Card>
+  </CardGroup>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<div className="mt-20 mb-16 max-w-5xl mx-auto px-6">
+  <div className="dark:bg-[#1a1d27] bg-gray-50 rounded-2xl p-8 md:p-12 dark:border-[#27272a] border-gray-200 border text-center">
+    <h2 className="text-3xl font-bold dark:text-white text-gray-900 mb-4">Ready to get started?</h2>
+    <p className="dark:text-gray-400 text-gray-600 text-lg mb-8 max-w-2xl mx-auto">
+      Sign up for a free account and start building powerful search experiences in minutes.
+    </p>
+    <div className="flex flex-wrap gap-4 justify-center">
+      <a 
+        href="https://console.topk.io" 
+        className="inline-flex items-center px-8 py-3 rounded-lg text-white font-semibold transition-colors no-underline"
+        style={{backgroundColor: '#f04e04'}}
+        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#d94404'}
+        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f04e04'}
+      >
+        Get Your API Key
+        <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </a>
+      <a 
+        href="/quickstart" 
+        className="inline-flex items-center px-8 py-3 rounded-lg dark:bg-white/10 bg-gray-100 dark:text-white text-gray-900 font-semibold dark:border-white/30 border-gray-300 border transition-all no-underline dark:hover:bg-white/20 hover:bg-gray-200"
+      >
+        View Quickstart
+      </a>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,247 @@
+---
+title: Create Collection
+description: Create a new collection with a defined schema
+---
+
+Creates a new collection with the specified name and schema. Collections are containers for documents that share a common structure.
+
+## Method Signature
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    collections().create(
+      name: string,
+      schema: Record<string, FieldSpec>
+    ): Promise<Collection>
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    collections().create(
+      collection_name: str,
+      schema: Mapping[str, FieldSpec]
+    ) -> Collection
+    ```
+  </Tab>
+</Tabs>
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  The name of the collection to create. Must be unique within the project.
+</ParamField>
+
+<ParamField path="schema" type="Record<string, FieldSpec>" required>
+  The schema definition for the collection. Maps field names to their specifications, including data types and indexes.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Collection" type="object">
+  Returns a Collection object containing metadata about the newly created collection.
+  
+  <ResponseField name="name" type="string">
+    Name of the collection
+  </ResponseField>
+  
+  <ResponseField name="orgId" type="string">
+    Organization ID that owns the collection
+  </ResponseField>
+  
+  <ResponseField name="projectId" type="string">
+    Project ID that contains the collection
+  </ResponseField>
+  
+  <ResponseField name="schema" type="Record<string, CollectionFieldSpec>">
+    Schema definition for the collection fields
+  </ResponseField>
+  
+  <ResponseField name="region" type="string">
+    Region where the collection is stored
+  </ResponseField>
+</ResponseField>
+
+## Examples
+
+### Basic Text Collection
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+    import { text, int } from "topk-js/schema";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collection = await client.collections().create("books", {
+      title: text().required(),
+      author: text(),
+      published_year: int()
+    });
+
+    console.log(`Created collection: ${collection.name}`);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    from topk_sdk.schema import text, int
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collection = client.collections().create("books", schema={
+      "title": text().required(),
+      "author": text(),
+      "published_year": int()
+    })
+
+    print(f"Created collection: {collection.name}")
+    ```
+  </Tab>
+</Tabs>
+
+### Vector Search Collection
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+    import { text, f32Vector, vectorIndex } from "topk-js/schema";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collection = await client.collections().create("products", {
+      name: text().required(),
+      description: text(),
+      embedding: f32Vector({ dimension: 1536 }).index(
+        vectorIndex({ metric: "cosine" })
+      )
+    });
+
+    console.log(`Created collection with vector index: ${collection.name}`);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    from topk_sdk.schema import text, f32_vector, vector_index
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collection = client.collections().create("products", schema={
+      "name": text().required(),
+      "description": text(),
+      "embedding": f32_vector(dimension=1536).index(
+        vector_index(metric="cosine")
+      )
+    })
+
+    print(f"Created collection with vector index: {collection.name}")
+    ```
+  </Tab>
+</Tabs>
+
+### Keyword Search Collection
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+    import { text, int, keywordIndex } from "topk-js/schema";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collection = await client.collections().create("articles", {
+      title: text().required().index(keywordIndex()),
+      content: text().index(keywordIndex()),
+      views: int()
+    });
+
+    console.log(`Created collection with keyword indexes: ${collection.name}`);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    from topk_sdk.schema import text, int, keyword_index
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collection = client.collections().create("articles", schema={
+      "title": text().required().index(keyword_index()),
+      "content": text().index(keyword_index()),
+      "views": int()
+    })
+
+    print(f"Created collection with keyword indexes: {collection.name}")
+    ```
+  </Tab>
+</Tabs>
+
+### Semantic Search Collection
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+    import { text, semanticIndex } from "topk-js/schema";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collection = await client.collections().create("documents", {
+      title: text().required(),
+      content: text().index(
+        semanticIndex({ model: "cohere/embed-v4" })
+      )
+    });
+
+    console.log(`Created collection with semantic index: ${collection.name}`);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    from topk_sdk.schema import text, semantic_index
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collection = client.collections().create("documents", schema={
+      "title": text().required(),
+      "content": text().index(
+        semantic_index(model="cohere/embed-v4")
+      )
+    })
+
+    print(f"Created collection with semantic index: {collection.name}")
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Once created, a collection's schema cannot be modified. Plan your schema carefully before creating the collection.
+</Note>

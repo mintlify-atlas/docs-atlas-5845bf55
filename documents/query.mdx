@@ -1,0 +1,547 @@
+---
+title: "Query Documents"
+description: "Execute complex queries against a TopK collection with filtering, selection, and ranking"
+---
+
+## Overview
+
+The `query()` method executes a query against a collection. Queries are built by chaining together stages like `select()`, `filter()`, `topk()`, `limit()`, and `sort()` to create powerful search and retrieval operations.
+
+## Method Signature
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    query(query: Query, options?: QueryOptions): Promise<Array<Record<string, any>>>
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    def query(
+        query: Query,
+        lsn: Optional[str] = None,
+        consistency: Optional[ConsistencyLevel] = None
+    ) -> list[dict[str, Any]]:
+        """Execute a query against the collection."""
+    ```
+  </Tab>
+</Tabs>
+
+## Parameters
+
+<ParamField path="query" type="Query" required>
+  A query object built using query stages like `select()`, `filter()`, `topk()`, etc.
+</ParamField>
+
+<ParamField path="options" type="QueryOptions">
+  Optional query options:
+  - `lsn`: Wait for writes up to this Log Sequence Number before executing the query
+  - `consistency`: Consistency level (`'indexed'` or `'strong'`)
+</ParamField>
+
+## Returns
+
+<ResponseField name="results" type="Array<Record<string, any>>">
+  An array of documents matching the query. Each document contains the fields specified in the `select()` stage, or all fields if no select stage is used.
+</ResponseField>
+
+## Query Stages
+
+### select()
+
+Specify which fields to return and compute derived fields.
+
+<CodeGroup>
+```javascript JavaScript
+import { select, field } from "topk-js/query";
+
+const query = select({
+  title: field("title"),
+  author: field("author"),
+  price_with_tax: field("price").mul(1.08)
+});
+```
+
+```python Python
+from topk_sdk.query import select, field
+
+query = select({
+    "title": field("title"),
+    "author": field("author"),
+    "price_with_tax": field("price").mul(1.08)
+})
+```
+</CodeGroup>
+
+### filter()
+
+Filter documents based on conditions.
+
+<CodeGroup>
+```javascript JavaScript
+import { filter, field } from "topk-js/query";
+
+const query = filter(
+  field("published_year").gte(2000)
+    .and(field("price").lt(50))
+);
+```
+
+```python Python
+from topk_sdk.query import filter, field
+
+query = filter(
+    field("published_year").gte(2000)
+    .and_(field("price").lt(50))
+)
+```
+</CodeGroup>
+
+### topk()
+
+Select the top K documents based on a scoring expression.
+
+<CodeGroup>
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+const query = select({
+  title: field("title"),
+  score: fn.vectorDistance("embedding", [0.1, 0.2, 0.3, 0.4])
+}).topk(field("score"), 10);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+query = select({
+    "title": field("title"),
+    "score": fn.vector_distance("embedding", [0.1, 0.2, 0.3, 0.4])
+}).topk(field("score"), 10)
+```
+</CodeGroup>
+
+### limit()
+
+Limit the number of results returned.
+
+<CodeGroup>
+```javascript JavaScript
+import { filter, field } from "topk-js/query";
+
+const query = filter(field("in_stock").eq(true)).limit(100);
+```
+
+```python Python
+from topk_sdk.query import filter, field
+
+query = filter(field("in_stock").eq(True)).limit(100)
+```
+</CodeGroup>
+
+### sort()
+
+Sort results by an expression.
+
+<CodeGroup>
+```javascript JavaScript
+import { filter, field } from "topk-js/query";
+
+const query = filter(field("category").eq("books"))
+  .sort(field("published_year"), false); // descending
+```
+
+```python Python
+from topk_sdk.query import filter, field
+
+query = filter(field("category").eq("books")).sort(
+    field("published_year"), asc=False
+)
+```
+</CodeGroup>
+
+## Examples
+
+### Vector Search
+
+Find the most similar documents using vector distance.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const queryVector = [0.12, 0.45, 0.78, 0.23];
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    author: field("author"),
+    distance: fn.vectorDistance("embedding", queryVector)
+  }).topk(field("distance"), 10)
+);
+
+results.forEach(doc => {
+  console.log(`${doc.title} by ${doc.author} (distance: ${doc.distance})`);
+});
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import select, field, fn
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+query_vector = [0.12, 0.45, 0.78, 0.23]
+
+results = client.collection("books").query(
+    select({
+        "title": field("title"),
+        "author": field("author"),
+        "distance": fn.vector_distance("embedding", query_vector)
+    }).topk(field("distance"), 10)
+)
+
+for doc in results:
+    print(f"{doc['title']} by {doc['author']} (distance: {doc['distance']})")
+```
+</CodeGroup>
+
+### Filtered Search
+
+Combine filtering with vector search.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    author: field("author"),
+    year: field("published_year"),
+    distance: fn.vectorDistance("embedding", [0.1, 0.2, 0.3, 0.4])
+  })
+  .filter(
+    field("published_year").gte(2000)
+      .and(field("genres").contains("Science Fiction"))
+  )
+  .topk(field("distance"), 20)
+);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import select, field, fn
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+results = client.collection("books").query(
+    select({
+        "title": field("title"),
+        "author": field("author"),
+        "year": field("published_year"),
+        "distance": fn.vector_distance("embedding", [0.1, 0.2, 0.3, 0.4])
+    })
+    .filter(
+        field("published_year").gte(2000)
+        .and_(field("genres").contains("Science Fiction"))
+    )
+    .topk(field("distance"), 20)
+)
+```
+</CodeGroup>
+
+### Keyword Search
+
+Search using keyword matching on indexed fields.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    author: field("author"),
+    score: fn.bm25Score()
+  })
+  .filter(field("title").matchAny(["machine", "learning", "ai"]))
+  .topk(field("score"), 10)
+);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import select, field, fn
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+results = client.collection("books").query(
+    select({
+        "title": field("title"),
+        "author": field("author"),
+        "score": fn.bm25_score()
+    })
+    .filter(field("title").match_any(["machine", "learning", "ai"]))
+    .topk(field("score"), 10)
+)
+```
+</CodeGroup>
+
+### Sparse Vector Search
+
+Search using sparse vector embeddings.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { select, field, fn } from "topk-js/query";
+import { f32SparseVector } from "topk-js/data";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const sparseQuery = f32SparseVector({
+  0: 0.5,
+  10: 0.8,
+  100: 0.3
+});
+
+const results = await client.collection("documents").query(
+  select({
+    content: field("content"),
+    score: fn.vectorDistance("sparse_embedding", sparseQuery)
+  }).topk(field("score"), 15)
+);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import select, field, fn
+from topk_sdk.data import f32_sparse_vector
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+sparse_query = f32_sparse_vector({
+    0: 0.5,
+    10: 0.8,
+    100: 0.3
+})
+
+results = client.collection("documents").query(
+    select({
+        "content": field("content"),
+        "score": fn.vector_distance("sparse_embedding", sparse_query)
+    }).topk(field("score"), 15)
+)
+```
+</CodeGroup>
+
+### Semantic Search
+
+Use semantic similarity for text search.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const results = await client.collection("articles").query(
+  select({
+    title: field("title"),
+    content: field("content"),
+    similarity: fn.semanticSimilarity("content", "artificial intelligence applications")
+  }).topk(field("similarity"), 10)
+);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import select, field, fn
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+results = client.collection("articles").query(
+    select({
+        "title": field("title"),
+        "content": field("content"),
+        "similarity": fn.semantic_similarity(
+            "content", 
+            "artificial intelligence applications"
+        )
+    }).topk(field("similarity"), 10)
+)
+```
+</CodeGroup>
+
+### Complex Expressions
+
+Use computed fields and complex scoring logic.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const results = await client.collection("products").query(
+  select({
+    name: field("name"),
+    base_price: field("price"),
+    discount: field("discount_percent"),
+    final_price: field("price").mul(
+      field("discount_percent").div(100).sub(1).abs()
+    ),
+    in_stock: field("in_stock"),
+    score: fn.vectorDistance("embedding", [0.1, 0.2, 0.3, 0.4])
+      .boost(field("in_stock").eq(true), 1.5)
+      .boost(field("discount_percent").gt(20), 1.2)
+  })
+  .filter(field("category").eq("electronics"))
+  .topk(field("score"), 25)
+);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import select, field, fn
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+results = client.collection("products").query(
+    select({
+        "name": field("name"),
+        "base_price": field("price"),
+        "discount": field("discount_percent"),
+        "final_price": field("price").mul(
+            field("discount_percent").div(100).sub(1).abs_()
+        ),
+        "in_stock": field("in_stock"),
+        "score": fn.vector_distance("embedding", [0.1, 0.2, 0.3, 0.4])
+            .boost(field("in_stock").eq(True), 1.5)
+            .boost(field("discount_percent").gt(20), 1.2)
+    })
+    .filter(field("category").eq("electronics"))
+    .topk(field("score"), 25)
+)
+```
+</CodeGroup>
+
+### Consistency Guarantees
+
+Wait for specific writes before querying.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { filter, field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Perform an upsert and get the LSN
+const lsn = await client.collection("books").upsert([{
+  _id: "book_1",
+  title: "New Book",
+  author: "New Author"
+}]);
+
+// Query with consistency guarantee
+const results = await client.collection("books").query(
+  filter(field("author").eq("New Author")),
+  { lsn: lsn, consistency: 'strong' }
+);
+```
+
+```python Python
+from topk_sdk import Client, ConsistencyLevel
+from topk_sdk.query import filter, field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Perform an upsert and get the LSN
+lsn = client.collection("books").upsert([{
+    "_id": "book_1",
+    "title": "New Book",
+    "author": "New Author"
+}])
+
+# Query with consistency guarantee
+results = client.collection("books").query(
+    filter(field("author").eq("New Author")),
+    lsn=lsn,
+    consistency=ConsistencyLevel.Strong
+)
+```
+</CodeGroup>
+
+## Best Practices
+
+1. **Use Filters Early**: Apply `filter()` stages early in your query pipeline to reduce the number of documents that need processing.
+
+2. **Select Only Needed Fields**: Use `select()` to specify only the fields you need, reducing data transfer and improving performance.
+
+3. **Index Appropriately**: Ensure fields used in vector search have vector indexes, and fields used in keyword search have keyword indexes.
+
+4. **Batch Queries**: If you need to perform multiple independent queries, consider running them in parallel.
+
+5. **Use topk() for Ranking**: When you need ranked results, use `topk()` instead of `sort().limit()` for better performance.
+
+## Related Methods
+
+- [`get()`](/documents/get) - Retrieve documents by their IDs
+- [`upsert()`](/documents/upsert) - Insert or update documents
+- [`update()`](/documents/update) - Update existing documents
+- [`delete()`](/documents/delete) - Remove documents

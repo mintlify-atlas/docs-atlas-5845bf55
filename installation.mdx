@@ -1,0 +1,223 @@
+---
+title: Installation
+description: Install the TopK SDK and set up your client
+---
+
+Get started with TopK by installing the SDK for your preferred language and setting up authentication.
+
+## Install the SDK
+
+Choose your language and install the TopK SDK:
+
+<CodeGroup>
+
+```bash Python
+pip install topk-sdk
+```
+
+```bash npm
+npm install topk-js
+```
+
+```bash yarn
+yarn add topk-js
+```
+
+```bash pnpm
+pnpm add topk-js
+```
+
+</CodeGroup>
+
+## Get your API key
+
+Before you can use TopK, you need to obtain an API key from the TopK Console.
+
+<Info>
+  TopK API keys are **project-specific**. Each project requires its own API key.
+</Info>
+
+<Steps>
+  <Step title="Go to the TopK Console">
+    Visit [console.topk.io](https://console.topk.io) in your browser.
+  </Step>
+  
+  <Step title="Sign in or create an account">
+    Authenticate with your credentials or create a new account if you don't have one.
+  </Step>
+  
+  <Step title="Navigate to your project">
+    Select an existing project or create a new one. Projects help you organize your collections and manage access.
+  </Step>
+  
+  <Step title="Generate an API key">
+    Click to generate a new API key for your project.
+    
+    <Warning>
+      API keys can only be **viewed once** at creation time. Store it securely - you won't be able to see it again.
+    </Warning>
+  </Step>
+</Steps>
+
+<Note>
+  Keep your API key secure and never commit it to version control. Use environment variables or secret management systems to store it safely.
+</Note>
+
+## Initialize the client
+
+Once you have your API key, initialize a TopK client. You'll need to specify both your API key and a [region](/regions).
+
+<CodeGroup>
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="YOUR_TOPK_API_KEY",
+    region="aws-us-east-1-elastica"
+)
+```
+
+```python Python (Async)
+from topk_sdk import AsyncClient
+
+client = AsyncClient(
+    api_key="YOUR_TOPK_API_KEY",
+    region="aws-us-east-1-elastica"
+)
+```
+
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+```
+
+</CodeGroup>
+
+### Configuration options
+
+The client accepts additional configuration options:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client, RetryConfig
+    
+    client = Client(
+        api_key="YOUR_TOPK_API_KEY",
+        region="aws-us-east-1-elastica",
+        host="topk.io",  # Custom host (optional)
+        https=True,  # Use HTTPS (default: True)
+        retry_config=RetryConfig(
+            max_retries=3,
+            timeout=30000,  # milliseconds
+        )
+    )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+    
+    const client = new Client({
+      apiKey: "YOUR_TOPK_API_KEY",
+      region: "aws-us-east-1-elastica",
+      host: "topk.io",  // Custom host (optional)
+      https: true,  // Use HTTPS (default: true)
+      retryConfig: {
+        maxRetries: 3,
+        timeout: 30000,  // milliseconds
+      }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+For a complete list of client configuration options, see the SDK reference:
+- [Python SDK Reference](/sdk/python/client)
+- [JavaScript SDK Reference](/sdk/javascript/client)
+
+## Understanding regions
+
+<Warning>
+  TopK clients are **region-specific**. You must specify a region when creating a client.
+  
+  Attempting to access collections or documents outside the specified region will result in a region mismatch error.
+</Warning>
+
+A region determines where your data is physically stored. TopK maps regions to specific cloud provider locations:
+
+| Region Name | Cloud Provider | Location |
+|-------------|----------------|----------|
+| `aws-us-east-1-elastica` | AWS | N. Virginia (us-east-1) |
+| `aws-eu-central-1-monstera` | AWS | Frankfurt (eu-central-1) |
+
+Choose a region based on:
+- **Data residency requirements** - Where your data needs to be stored legally
+- **Latency** - Choose a region close to your users or application
+- **Compliance** - Specific regulatory requirements for data location
+
+See the [Regions](/regions) page for more details.
+
+## Using with SSR frameworks
+
+If you're using the TopK JavaScript SDK in a server-side rendering (SSR) environment, you may need additional configuration.
+
+<AccordionGroup>
+  <Accordion title="Vite (Remix, Nuxt, SvelteKit, Astro)">
+    If you're using `topk-js` in a Vite project with SSR, configure it as an external dependency:
+    
+    ```typescript vite.config.ts
+    export default defineConfig({
+      // ...
+      ssr: {
+        external: ["topk-js"],
+      },
+      optimizeDeps: {
+        exclude: ["topk-js"],
+      },
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Webpack/Turbopack (Next.js)">
+    For Next.js projects, especially with App Router and Server Components, mark `topk-js` as external:
+    
+    ```typescript next.config.ts
+    import type { NextConfig } from "next";
+    
+    const nextConfig: NextConfig = {
+      serverExternalPackages: ["topk-js"],
+    };
+    
+    export default nextConfig;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+Now that you have TopK installed and configured, you're ready to start building:
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first search application in 5 minutes
+  </Card>
+  
+  <Card title="Create a collection" icon="folder" href="/collections/create">
+    Learn how to define schemas and create collections
+  </Card>
+  
+  <Card title="Add documents" icon="file-plus" href="/documents/upsert">
+    Insert your first documents
+  </Card>
+  
+  <Card title="Query data" icon="magnifying-glass" href="/documents/query">
+    Search your collections with semantic and keyword search
+  </Card>
+</CardGroup>

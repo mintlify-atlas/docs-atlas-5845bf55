@@ -1,0 +1,212 @@
+---
+title: Regions
+description: Available TopK regions and how to choose the right one
+---
+
+TopK regions determine where your data is physically stored and processed. Choosing the right region is important for latency, compliance, and data residency requirements.
+
+## What is a region?
+
+A **region** in TopK maps to a specific cloud provider location where your collections and documents are stored. When you create a TopK client, you specify a region, and all operations are performed against that region.
+
+<Warning>
+  TopK clients are **region-specific**. 
+  
+  A client configured for `aws-us-east-1-elastica` cannot access collections in `aws-eu-central-1-monstera` and vice versa. You must create separate clients for each region.
+</Warning>
+
+## Available regions
+
+TopK is currently available in the following regions:
+
+| Region Name | Cloud Provider | Cloud Region | Location |
+|-------------|----------------|--------------|----------|
+| `aws-us-east-1-elastica` | AWS | us-east-1 | N. Virginia, USA |
+| `aws-eu-central-1-monstera` | AWS | eu-central-1 | Frankfurt, Germany |
+
+## Choosing a region
+
+Consider these factors when selecting a region:
+
+### Latency and performance
+
+Choose a region geographically close to your users or application servers to minimize network latency:
+
+- **North America users** → `aws-us-east-1-elastica`
+- **European users** → `aws-eu-central-1-monstera`
+
+<Info>
+  Lower latency improves user experience, especially for interactive search applications where speed matters.
+</Info>
+
+### Data residency and compliance
+
+Some applications have legal or regulatory requirements for where data can be stored:
+
+- **GDPR compliance** - If you need to keep EU citizen data in Europe, use `aws-eu-central-1-monstera`
+- **US-based applications** - For data that must remain in the United States, use `aws-us-east-1-elastica`
+
+### Cost considerations
+
+Data transfer costs can vary by region. If you're processing large volumes of data:
+
+- Store data in the same region as your application to minimize egress costs
+- Consider where your data originates and where it's consumed
+
+## Specifying a region
+
+You specify the region when initializing your TopK client:
+
+<CodeGroup>
+
+```python Python
+from topk_sdk import Client
+
+# US East region
+us_client = Client(
+    api_key="YOUR_API_KEY",
+    region="aws-us-east-1-elastica"
+)
+
+# EU Central region
+eu_client = Client(
+    api_key="YOUR_API_KEY",
+    region="aws-eu-central-1-monstera"
+)
+```
+
+```javascript JavaScript
+import { Client } from "topk-js";
+
+// US East region
+const usClient = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+// EU Central region
+const euClient = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-eu-central-1-monstera"
+});
+```
+
+</CodeGroup>
+
+## Multi-region architecture
+
+If you need to support users in multiple geographic locations, you can create clients for multiple regions:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    
+    # Initialize clients for multiple regions
+    clients = {
+        "us": Client(
+            api_key="YOUR_API_KEY",
+            region="aws-us-east-1-elastica"
+        ),
+        "eu": Client(
+            api_key="YOUR_API_KEY",
+            region="aws-eu-central-1-monstera"
+        ),
+    }
+    
+    # Route queries based on user location
+    def get_client_for_user(user_region: str) -> Client:
+        if user_region in ["EU", "UK", "DE", "FR"]:
+            return clients["eu"]
+        return clients["us"]
+    
+    # Use the appropriate client
+    user_region = "EU"
+    client = get_client_for_user(user_region)
+    results = client.collection("products").query(...)
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+    
+    // Initialize clients for multiple regions
+    const clients = {
+      us: new Client({
+        apiKey: "YOUR_API_KEY",
+        region: "aws-us-east-1-elastica"
+      }),
+      eu: new Client({
+        apiKey: "YOUR_API_KEY",
+        region: "aws-eu-central-1-monstera"
+      }),
+    };
+    
+    // Route queries based on user location
+    function getClientForUser(userRegion: string): Client {
+      if (["EU", "UK", "DE", "FR"].includes(userRegion)) {
+        return clients.eu;
+      }
+      return clients.us;
+    }
+    
+    // Use the appropriate client
+    const userRegion = "EU";
+    const client = getClientForUser(userRegion);
+    const results = await client.collection("products").query(...);
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Each region requires separate collections. You'll need to manage data synchronization between regions if you want to replicate data.
+</Note>
+
+## Region mismatch errors
+
+If you try to access a collection that doesn't exist in the specified region, you'll receive a region mismatch error:
+
+```
+Error: collection not found
+```
+
+To resolve this:
+
+1. Verify you're using the correct region for your client
+2. Ensure the collection was created in the same region
+3. Check that you're not mixing collections across different regions
+
+## Custom deployments
+
+Need TopK in a specific region or in your own VPC?
+
+<Info>
+  For custom region deployments or private cloud installations, please contact our team at support@topk.io.
+</Info>
+
+Custom deployment options include:
+- Additional AWS regions
+- GCP or Azure deployments
+- Private VPC deployments
+- On-premises installations
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Set up your client with the appropriate region
+  </Card>
+  
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first application
+  </Card>
+  
+  <Card title="Create collections" icon="folder" href="/collections/create">
+    Learn how to create region-specific collections
+  </Card>
+  
+  <Card title="Architecture" icon="diagram-project" href="/introduction#architecture">
+    Understand TopK's organizational structure
+  </Card>
+</CardGroup>

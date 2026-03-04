@@ -1,0 +1,247 @@
+---
+title: Semantic Search
+description: Search using natural language with automatic embedding generation
+---
+
+Semantic search enables you to search documents using natural language queries instead of exact keyword matches. TopK automatically generates embeddings for your text fields and handles the similarity computation.
+
+## Overview
+
+With semantic search, you can:
+- Search using natural language queries without providing embeddings
+- Automatically generate embeddings using built-in models
+- Find semantically similar content even when exact words don't match
+- Combine semantic search with filters and other search types
+
+## Schema Setup
+
+To enable semantic search on a field, add a `semanticIndex()` to a text field:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { Client } from "topk-js";
+import { text, semanticIndex } from "topk-js/schema";
+
+const client = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+await client.collections().create("books", {
+  title: text().required().index(semanticIndex()),
+  summary: text().index(semanticIndex({ model: "cohere/embed-v4" }))
+});
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.schema import text, semantic_index
+
+client = Client(
+  api_key="YOUR_API_KEY",
+  region="aws-us-east-1-elastica"
+)
+
+client.collections().create("books", schema={
+  "title": text().required().index(semantic_index()),
+  "summary": text().index(semantic_index(model="cohere/embed-v4"))
+})
+```
+
+</CodeGroup>
+
+### Supported Models
+
+TopK supports the following embedding models:
+- `cohere/embed-v4` (default)
+- `cohere/embed-english-v3`
+- `cohere/embed-multilingual-v3`
+
+### Embedding Types
+
+You can specify the embedding data type for optimized storage:
+- `float32` - Full precision (default)
+- `uint8` - Quantized to 8-bit unsigned integers
+- `binary` - Binary embeddings for maximum compression
+
+<CodeGroup>
+
+```javascript JavaScript
+import { text, semanticIndex } from "topk-js/schema";
+
+const schema = {
+  title: text().index(semanticIndex({
+    model: "cohere/embed-v4",
+    embeddingType: "uint8"
+  }))
+};
+```
+
+```python Python
+from topk_sdk.schema import text, semantic_index
+
+schema = {
+  "title": text().index(semantic_index(model="cohere/embed-v4"))
+}
+```
+
+</CodeGroup>
+
+## Inserting Documents
+
+When you insert documents, TopK automatically generates embeddings for fields with semantic indexes:
+
+<CodeGroup>
+
+```javascript JavaScript
+await client.collection("books").upsert([
+  { 
+    _id: "gatsby", 
+    title: "The Great Gatsby",
+    summary: "A story of love and the American Dream"
+  },
+  { 
+    _id: "1984", 
+    title: "1984",
+    summary: "A dystopian novel about totalitarianism"
+  }
+]);
+```
+
+```python Python
+client.collection("books").upsert([
+  {
+    "_id": "gatsby",
+    "title": "The Great Gatsby",
+    "summary": "A story of love and the American Dream"
+  },
+  {
+    "_id": "1984",
+    "title": "1984",
+    "summary": "A dystopian novel about totalitarianism"
+  }
+])
+```
+
+</CodeGroup>
+
+## Querying with Semantic Search
+
+Use `fn.semanticSimilarity()` to compute semantic similarity between your query and indexed fields:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.semanticSimilarity("title", "classic American novel")
+  })
+  .topk(field("similarity"), 10)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    similarity=fn.semantic_similarity("title", "classic American novel")
+  )
+  .topk(field("similarity"), 10)
+)
+```
+
+</CodeGroup>
+
+### Multiple Field Search
+
+Combine semantic similarity scores from multiple fields:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    title_sim: fn.semanticSimilarity("title", "love story"),
+    summary_sim: fn.semanticSimilarity("summary", "love story")
+  })
+  .topk(
+    field("title_sim").add(field("summary_sim")),
+    10
+  )
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    title_sim=fn.semantic_similarity("title", "love story"),
+    summary_sim=fn.semantic_similarity("summary", "love story")
+  )
+  .topk(
+    field("title_sim") + field("summary_sim"),
+    10
+  )
+)
+```
+
+</CodeGroup>
+
+## Combining with Filters
+
+You can filter results before applying semantic search:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, field, fn, match } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.semanticSimilarity("summary", "dystopian society")
+  })
+  .filter(match("totalitarian", { field: "summary" }))
+  .topk(field("similarity"), 5)
+);
+```
+
+```python Python
+from topk_sdk.query import select, filter, field, fn, match
+
+results = client.collection("books").query(
+  select(
+    "title",
+    similarity=fn.semantic_similarity("summary", "dystopian society")
+  )
+  .filter(match("totalitarian", "summary"))
+  .topk(field("similarity"), 5)
+)
+```
+
+</CodeGroup>
+
+<Note>
+Semantic indexes automatically handle embedding generation during document insertion. You don't need to provide or manage embeddings yourself.
+</Note>
+
+<Tip>
+For best results, use descriptive queries that capture the semantic meaning you're looking for, rather than just keywords.
+</Tip>
+
+## Related Concepts
+
+- [Reranking](/concepts/reranking) - Improve semantic search results with reranking
+- [True Hybrid Search](/concepts/true-hybrid-search) - Combine semantic and keyword search
+- [Vector Search](/concepts/vector-search) - Bring your own embeddings

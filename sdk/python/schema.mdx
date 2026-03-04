@@ -1,0 +1,550 @@
+---
+title: "Schema"
+description: "Define field types and indexes for TopK collections"
+---
+
+The schema module provides functions to define field types and indexes for your collections.
+
+## Overview
+
+When creating a collection, you define a schema that specifies:
+- **Field types** (text, int, float, vectors, etc.)
+- **Required/optional** fields
+- **Indexes** for search and retrieval
+
+```python
+from topk_sdk.schema import text, int, float, semantic_index
+
+client.collections().create(
+    "books",
+    schema={
+        "title": text().required().index(semantic_index()),
+        "year": int().required(),
+        "rating": float()
+    }
+)
+```
+
+<Note>
+Fields not defined in the schema can still be upserted, but they won't have type validation or indexes.
+</Note>
+
+---
+
+## FieldSpec
+
+The `FieldSpec` class represents a field specification. It's created by data type functions like `text()`, `int()`, `float()`, etc.
+
+### required()
+
+Mark a field as required. All fields are optional by default.
+
+```python
+from topk_sdk.schema import text
+
+schema = {
+    "title": text().required()
+}
+```
+
+<ResponseField name="return" type="FieldSpec">
+  The field specification with the required constraint.
+</ResponseField>
+
+### optional()
+
+Explicitly mark a field as optional (this is the default).
+
+```python
+schema = {
+    "description": text().optional()
+}
+```
+
+<ResponseField name="return" type="FieldSpec">
+  The field specification marked as optional.
+</ResponseField>
+
+### index()
+
+Create an index on a field for efficient searching.
+
+```python
+from topk_sdk.schema import text, keyword_index
+
+schema = {
+    "title": text().index(keyword_index())
+}
+```
+
+<ParamField path="index" type="FieldIndex" required>
+  The index to create. Can be `semantic_index()`, `keyword_index()`, `vector_index()`, or `multi_vector_index()`.
+</ParamField>
+
+<ResponseField name="return" type="FieldSpec">
+  The field specification with the index attached.
+</ResponseField>
+
+---
+
+## Data Types
+
+### text()
+
+Create a field specification for text values.
+
+```python
+from topk_sdk.schema import text
+
+schema = {
+    "title": text(),
+    "description": text().required()
+}
+```
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for text values.
+</ResponseField>
+
+### int()
+
+Create a field specification for integer values.
+
+```python
+from topk_sdk.schema import int
+
+schema = {
+    "year": int(),
+    "page_count": int().required()
+}
+```
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for integer values.
+</ResponseField>
+
+### float()
+
+Create a field specification for floating-point values.
+
+```python
+from topk_sdk.schema import float
+
+schema = {
+    "price": float(),
+    "rating": float().required()
+}
+```
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for float values.
+</ResponseField>
+
+### bool()
+
+Create a field specification for boolean values.
+
+```python
+from topk_sdk.schema import bool
+
+schema = {
+    "is_published": bool(),
+    "in_stock": bool().required()
+}
+```
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for boolean values.
+</ResponseField>
+
+### bytes()
+
+Create a field specification for binary data.
+
+```python
+from topk_sdk.schema import bytes
+
+schema = {
+    "image": bytes(),
+    "thumbnail": bytes().required()
+}
+```
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for bytes values.
+</ResponseField>
+
+### list()
+
+Create a field specification for list values.
+
+```python
+from topk_sdk.schema import list
+
+schema = {
+    "tags": list(value_type="text"),
+    "scores": list(value_type="float"),
+    "ids": list(value_type="integer")
+}
+```
+
+<ParamField path="value_type" type="Literal['text', 'integer', 'float']" required>
+  The type of values in the list. Must be one of: `"text"`, `"integer"`, or `"float"`.
+</ParamField>
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for list values.
+</ResponseField>
+
+---
+
+## Vector Types
+
+### f8_vector()
+
+Create a field specification for 8-bit float vectors.
+
+```python
+from topk_sdk.schema import f8_vector, vector_index
+
+schema = {
+    "embedding": f8_vector(dimension=1536).index(vector_index(metric="cosine"))
+}
+```
+
+<ParamField path="dimension" type="int" required>
+  The dimensionality of the vector.
+</ParamField>
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for 8-bit float vectors.
+</ResponseField>
+
+### f16_vector()
+
+Create a field specification for 16-bit float vectors.
+
+```python
+from topk_sdk.schema import f16_vector, vector_index
+
+schema = {
+    "embedding": f16_vector(dimension=1536).index(vector_index(metric="cosine"))
+}
+```
+
+<ParamField path="dimension" type="int" required>
+  The dimensionality of the vector.
+</ParamField>
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for 16-bit float vectors.
+</ResponseField>
+
+### f32_vector()
+
+Create a field specification for 32-bit float vectors.
+
+```python
+from topk_sdk.schema import f32_vector, vector_index
+
+schema = {
+    "embedding": f32_vector(dimension=1536).index(vector_index(metric="cosine"))
+}
+```
+
+<ParamField path="dimension" type="int" required>
+  The dimensionality of the vector.
+</ParamField>
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for 32-bit float vectors.
+</ResponseField>
+
+### u8_vector()
+
+Create a field specification for 8-bit unsigned integer vectors.
+
+```python
+from topk_sdk.schema import u8_vector, vector_index
+
+schema = {
+    "embedding": u8_vector(dimension=1536).index(vector_index(metric="cosine"))
+}
+```
+
+<ParamField path="dimension" type="int" required>
+  The dimensionality of the vector.
+</ParamField>
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for 8-bit unsigned integer vectors.
+</ResponseField>
+
+### i8_vector()
+
+Create a field specification for 8-bit signed integer vectors.
+
+```python
+from topk_sdk.schema import i8_vector, vector_index
+
+schema = {
+    "embedding": i8_vector(dimension=1536).index(vector_index(metric="cosine"))
+}
+```
+
+<ParamField path="dimension" type="int" required>
+  The dimensionality of the vector.
+</ParamField>
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for 8-bit signed integer vectors.
+</ResponseField>
+
+### binary_vector()
+
+Create a field specification for binary vectors.
+
+```python
+from topk_sdk.schema import binary_vector, vector_index
+
+schema = {
+    "embedding": binary_vector(dimension=128).index(vector_index(metric="hamming"))
+}
+```
+
+<ParamField path="dimension" type="int" required>
+  The dimensionality of the binary vector.
+</ParamField>
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for binary vectors.
+</ResponseField>
+
+### f32_sparse_vector()
+
+Create a field specification for 32-bit float sparse vectors.
+
+<Note>
+Sparse vectors use u32 dimension indices to support dictionaries of up to 2^32 - 1 terms.
+</Note>
+
+```python
+from topk_sdk.schema import f32_sparse_vector, vector_index
+
+schema = {
+    "sparse_embedding": f32_sparse_vector().index(vector_index(metric="dot_product"))
+}
+```
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for 32-bit float sparse vectors.
+</ResponseField>
+
+### u8_sparse_vector()
+
+Create a field specification for 8-bit unsigned integer sparse vectors.
+
+```python
+from topk_sdk.schema import u8_sparse_vector, vector_index
+
+schema = {
+    "sparse_embedding": u8_sparse_vector().index(vector_index(metric="dot_product"))
+}
+```
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for 8-bit unsigned integer sparse vectors.
+</ResponseField>
+
+### matrix()
+
+Create a field specification for matrix values (multi-vector fields).
+
+```python
+from topk_sdk.schema import matrix, multi_vector_index
+
+schema = {
+    "embeddings": matrix(dimension=1536, value_type="f32").index(
+        multi_vector_index(metric="maxsim")
+    )
+}
+```
+
+<ParamField path="dimension" type="int" required>
+  The dimensionality of each vector in the matrix.
+</ParamField>
+
+<ParamField path="value_type" type="Literal['f32', 'f16', 'f8', 'u8', 'i8']" required>
+  The data type for matrix values. Must be one of: `"f32"`, `"f16"`, `"f8"`, `"u8"`, or `"i8"`.
+</ParamField>
+
+<ResponseField name="return" type="FieldSpec">
+  A field specification for matrix values.
+</ResponseField>
+
+---
+
+## Indexes
+
+### vector_index()
+
+Create a vector index for similarity search on vector fields.
+
+```python
+from topk_sdk.schema import f32_vector, vector_index
+
+schema = {
+    "embedding": f32_vector(dimension=1536).index(
+        vector_index(metric="cosine")
+    )
+}
+```
+
+<ParamField path="metric" type="Literal['cosine', 'euclidean', 'dot_product', 'hamming']" required>
+  The distance metric to use:
+  - `"cosine"` - Cosine similarity (only dense vectors)
+  - `"euclidean"` - Euclidean distance (only dense vectors)
+  - `"dot_product"` - Dot product (dense and sparse vectors)
+  - `"hamming"` - Hamming distance (only binary vectors)
+</ParamField>
+
+<ResponseField name="return" type="FieldIndex">
+  A vector index configuration.
+</ResponseField>
+
+### keyword_index()
+
+Create a keyword index for full-text search on text fields.
+
+```python
+from topk_sdk.schema import text, keyword_index
+
+schema = {
+    "title": text().index(keyword_index()),
+    "description": text().index(keyword_index())
+}
+```
+
+<ResponseField name="return" type="FieldIndex">
+  A keyword index configuration.
+</ResponseField>
+
+### semantic_index()
+
+Create a semantic index for automatic embeddings and semantic search.
+
+<Note>
+TopK automatically generates embeddings for fields with semantic indexes. You don't need to manage embeddings manually.
+</Note>
+
+```python
+from topk_sdk.schema import text, semantic_index
+
+schema = {
+    "title": text().index(semantic_index()),
+    "content": text().index(semantic_index(model="cohere/embed-v4"))
+}
+```
+
+<ParamField path="model" type="str" default="cohere/embed-v4">
+  The embedding model to use. Supported models:
+  - `"cohere/embed-english-v3"` - English-only embeddings
+  - `"cohere/embed-multilingual-v3"` - Multilingual embeddings
+  - `"cohere/embed-v4"` - Latest Cohere model (default)
+
+  TopK supports the following embedding types for Cohere models:
+  - `float32`
+  - `uint8`
+  - `binary`
+</ParamField>
+
+<ResponseField name="return" type="FieldIndex">
+  A semantic index configuration.
+</ResponseField>
+
+### multi_vector_index()
+
+Create a multi-vector index for matrix fields (e.g., ColBERT-style retrieval).
+
+```python
+from topk_sdk.schema import matrix, multi_vector_index
+
+schema = {
+    "embeddings": matrix(dimension=128, value_type="f32").index(
+        multi_vector_index(
+            metric="maxsim",
+            sketch_bits=2048,
+            quantization="1bit"
+        )
+    )
+}
+```
+
+<ParamField path="metric" type="Literal['maxsim']" required>
+  The distance metric to use. Currently only `"maxsim"` (Maximum Similarity) is supported.
+</ParamField>
+
+<ParamField path="sketch_bits" type="int">
+  Number of bits for sketching. Used for approximate search optimization.
+</ParamField>
+
+<ParamField path="quantization" type="Literal['1bit', '2bit', 'scalar']">
+  Quantization strategy for compression:
+  - `"1bit"` - 1-bit quantization
+  - `"2bit"` - 2-bit quantization
+  - `"scalar"` - Scalar quantization
+</ParamField>
+
+<ResponseField name="return" type="FieldIndex">
+  A multi-vector index configuration.
+</ResponseField>
+
+---
+
+## Complete Example
+
+Here's a comprehensive example showing various field types and indexes:
+
+```python
+from topk_sdk import Client
+from topk_sdk.schema import (
+    text, int, float, bool,
+    f32_vector, f32_sparse_vector, matrix, list,
+    semantic_index, keyword_index, vector_index, multi_vector_index
+)
+
+client = Client(api_key="YOUR_KEY", region="aws-us-east-1-elastica")
+
+collection = client.collections().create(
+    "products",
+    schema={
+        # Text fields with indexes
+        "title": text().required().index(semantic_index()),
+        "description": text().index(keyword_index()),
+        
+        # Numeric fields
+        "price": float().required(),
+        "stock": int(),
+        "in_stock": bool(),
+        
+        # Vector fields
+        "title_embedding": f32_vector(dimension=1536).index(
+            vector_index(metric="cosine")
+        ),
+        "sparse_features": f32_sparse_vector().index(
+            vector_index(metric="dot_product")
+        ),
+        
+        # Multi-vector field
+        "colbert_embeddings": matrix(dimension=128, value_type="f32").index(
+            multi_vector_index(metric="maxsim")
+        ),
+        
+        # List fields
+        "tags": list(value_type="text"),
+        "ratings": list(value_type="float")
+    }
+)
+
+print(f"Created collection: {collection.name}")
+```

@@ -1,0 +1,270 @@
+---
+title: "Collections"
+description: "Managing TopK collections with the Python SDK"
+---
+
+## CollectionsClient
+
+Synchronous client for managing collections. Create, list, get, and delete collections using this client.
+
+Get a `CollectionsClient` instance from the main client:
+
+```python
+from topk_sdk import Client
+
+client = Client(api_key="YOUR_KEY", region="aws-us-east-1-elastica")
+collections = client.collections()
+```
+
+### create()
+
+Create a new collection with the specified schema.
+
+```python
+from topk_sdk.schema import text, int, semantic_index
+
+collection = client.collections().create(
+    "books",
+    schema={
+        "title": text().required().index(semantic_index()),
+        "year": int().required()
+    }
+)
+```
+
+<ParamField path="collection_name" type="str" required>
+  The name of the collection to create. Must be unique within your project.
+</ParamField>
+
+<ParamField path="schema" type="Mapping[str, FieldSpec]" required>
+  A dictionary mapping field names to field specifications. See [Schema documentation](/sdk/python/schema) for available field types and indexes.
+</ParamField>
+
+<ResponseField name="return" type="Collection">
+  The created collection object containing metadata like name, org_id, project_id, region, and schema.
+</ResponseField>
+
+### list()
+
+List all collections in your project.
+
+```python
+all_collections = client.collections().list()
+
+for collection in all_collections:
+    print(f"Collection: {collection.name}")
+    print(f"Region: {collection.region}")
+    print(f"Schema: {collection.schema}")
+```
+
+<ResponseField name="return" type="list[Collection]">
+  A list of all collections in your project.
+</ResponseField>
+
+### get()
+
+Get information about a specific collection.
+
+```python
+collection = client.collections().get("books")
+
+print(f"Name: {collection.name}")
+print(f"Schema: {collection.schema}")
+print(f"Region: {collection.region}")
+```
+
+<ParamField path="collection_name" type="str" required>
+  The name of the collection to retrieve.
+</ParamField>
+
+<ResponseField name="return" type="Collection">
+  The collection object containing metadata.
+</ResponseField>
+
+### delete()
+
+Delete a collection and all its documents.
+
+<Warning>
+This operation is irreversible. All documents in the collection will be permanently deleted.
+</Warning>
+
+```python
+client.collections().delete("books")
+```
+
+<ParamField path="collection_name" type="str" required>
+  The name of the collection to delete.
+</ParamField>
+
+<ResponseField name="return" type="None">
+  This method does not return a value.
+</ResponseField>
+
+---
+
+## AsyncCollectionsClient
+
+Asynchronous client for managing collections. All methods are identical to `CollectionsClient` but return awaitables.
+
+```python
+from topk_sdk import AsyncClient
+from topk_sdk.schema import text, semantic_index
+
+client = AsyncClient(api_key="YOUR_KEY", region="aws-us-east-1-elastica")
+
+# Create a collection
+collection = await client.collections().create(
+    "books",
+    schema={"title": text().index(semantic_index())}
+)
+
+# List all collections
+all_collections = await client.collections().list()
+
+# Get a specific collection
+collection = await client.collections().get("books")
+
+# Delete a collection
+await client.collections().delete("books")
+```
+
+### create()
+
+Create a new collection asynchronously.
+
+<ParamField path="collection_name" type="str" required>
+  The name of the collection to create.
+</ParamField>
+
+<ParamField path="schema" type="Mapping[str, FieldSpec]" required>
+  A dictionary mapping field names to field specifications.
+</ParamField>
+
+<ResponseField name="return" type="Awaitable[Collection]">
+  An awaitable that resolves to the created collection object.
+</ResponseField>
+
+### list()
+
+List all collections asynchronously.
+
+<ResponseField name="return" type="Awaitable[list[Collection]]">
+  An awaitable that resolves to a list of all collections.
+</ResponseField>
+
+### get()
+
+Get information about a specific collection asynchronously.
+
+<ParamField path="collection_name" type="str" required>
+  The name of the collection to retrieve.
+</ParamField>
+
+<ResponseField name="return" type="Awaitable[Collection]">
+  An awaitable that resolves to the collection object.
+</ResponseField>
+
+### delete()
+
+Delete a collection asynchronously.
+
+<ParamField path="collection_name" type="str" required>
+  The name of the collection to delete.
+</ParamField>
+
+<ResponseField name="return" type="Awaitable[None]">
+  An awaitable that resolves when the deletion is complete.
+</ResponseField>
+
+---
+
+## Collection Object
+
+The `Collection` object represents a collection in TopK and is returned by the `create()`, `get()`, and `list()` methods.
+
+```python
+collection = client.collections().get("books")
+
+# Access collection properties
+print(collection.name)       # "books"
+print(collection.org_id)     # Your organization ID
+print(collection.project_id) # Your project ID
+print(collection.region)     # "aws-us-east-1-elastica"
+print(collection.schema)     # {"title": FieldSpec(...), ...}
+```
+
+<ResponseField name="name" type="str">
+  The name of the collection.
+</ResponseField>
+
+<ResponseField name="org_id" type="str">
+  The organization ID that owns the collection.
+</ResponseField>
+
+<ResponseField name="project_id" type="str">
+  The project ID that owns the collection.
+</ResponseField>
+
+<ResponseField name="region" type="str">
+  The region where the collection is stored.
+</ResponseField>
+
+<ResponseField name="schema" type="dict[str, FieldSpec]">
+  The schema definition for the collection. Maps field names to their specifications.
+</ResponseField>
+
+---
+
+## Example: Full Workflow
+
+Here's a complete example showing how to create, use, and delete a collection:
+
+```python
+from topk_sdk import Client
+from topk_sdk.schema import text, int, semantic_index, keyword_index
+from topk_sdk.query import select, field, fn
+
+# Initialize client
+client = Client(api_key="YOUR_KEY", region="aws-us-east-1-elastica")
+
+# Create a collection with schema
+collection = client.collections().create(
+    "books",
+    schema={
+        "title": text().required().index(semantic_index()),
+        "description": text().index(keyword_index()),
+        "year": int()
+    }
+)
+
+print(f"Created collection: {collection.name}")
+
+# Insert some documents
+client.collection("books").upsert([
+    {"_id": "1", "title": "The Great Gatsby", "year": 1925},
+    {"_id": "2", "title": "1984", "year": 1949}
+])
+
+# Query the collection
+results = client.collection("books").query(
+    select(
+        "title", "year",
+        similarity=fn.semantic_similarity("title", "dystopian novel")
+    ).topk(field("similarity"), 10)
+)
+
+print(f"Found {len(results)} results")
+
+# List all collections
+all_collections = client.collections().list()
+print(f"Total collections: {len(all_collections)}")
+
+# Get collection info
+collection_info = client.collections().get("books")
+print(f"Collection region: {collection_info.region}")
+
+# Delete the collection
+client.collections().delete("books")
+print("Collection deleted")
+```

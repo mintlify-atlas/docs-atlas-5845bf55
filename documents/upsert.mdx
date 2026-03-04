@@ -1,0 +1,289 @@
+---
+title: "Upsert Documents"
+description: "Insert or update documents in a TopK collection"
+---
+
+## Overview
+
+The `upsert()` method inserts new documents or updates existing ones in a collection. Documents are identified by their `_id` field. If a document with the given `_id` already exists, it will be completely replaced with the new document.
+
+<Note>
+  Every document must have an `_id` field. This is the unique identifier for the document in the collection.
+</Note>
+
+## Method Signature
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    upsert(docs: Array<Record<string, any>>): Promise<string>
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    def upsert(documents: Sequence[Mapping[str, Any]]) -> str:
+        """Insert or update documents in the collection."""
+    ```
+  </Tab>
+</Tabs>
+
+## Parameters
+
+<ParamField path="docs" type="Array<Record<string, any>>" required>
+  An array of document objects to upsert. Each document must include an `_id` field.
+</ParamField>
+
+## Returns
+
+<ResponseField name="lsn" type="string">
+  The Log Sequence Number (LSN) at which the upsert was applied. This can be used for consistency guarantees in subsequent operations.
+</ResponseField>
+
+## Examples
+
+### Basic Upsert
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { f32Vector } from "topk-js/data";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const lsn = await client.collection("books").upsert([
+  {
+    _id: "book_1",
+    title: "The Great Gatsby",
+    author: "F. Scott Fitzgerald",
+    published_year: 1925,
+    genres: ["Fiction", "Classic"],
+    embedding: f32Vector([0.1, 0.2, 0.3, 0.4])
+  },
+  {
+    _id: "book_2",
+    title: "To Kill a Mockingbird",
+    author: "Harper Lee",
+    published_year: 1960,
+    genres: ["Fiction", "Classic"],
+    embedding: f32Vector([0.5, 0.6, 0.7, 0.8])
+  }
+]);
+
+console.log(`Upserted at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.data import f32_vector
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+lsn = client.collection("books").upsert([
+    {
+        "_id": "book_1",
+        "title": "The Great Gatsby",
+        "author": "F. Scott Fitzgerald",
+        "published_year": 1925,
+        "genres": ["Fiction", "Classic"],
+        "embedding": f32_vector([0.1, 0.2, 0.3, 0.4])
+    },
+    {
+        "_id": "book_2",
+        "title": "To Kill a Mockingbird",
+        "author": "Harper Lee",
+        "published_year": 1960,
+        "genres": ["Fiction", "Classic"],
+        "embedding": f32_vector([0.5, 0.6, 0.7, 0.8])
+    }
+])
+
+print(f"Upserted at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Upserting with Sparse Vectors
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { f32SparseVector } from "topk-js/data";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const lsn = await client.collection("documents").upsert([
+  {
+    _id: "doc_1",
+    content: "Machine learning and artificial intelligence",
+    sparse_embedding: f32SparseVector({
+      0: 0.42,
+      15: 0.89,
+      127: 0.31,
+      543: 0.67
+    })
+  }
+]);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.data import f32_sparse_vector
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+lsn = client.collection("documents").upsert([
+    {
+        "_id": "doc_1",
+        "content": "Machine learning and artificial intelligence",
+        "sparse_embedding": f32_sparse_vector({
+            0: 0.42,
+            15: 0.89,
+            127: 0.31,
+            543: 0.67
+        })
+    }
+])
+```
+</CodeGroup>
+
+### Batch Upsert
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Prepare a large batch of documents
+const documents = [];
+for (let i = 0; i < 1000; i++) {
+  documents.push({
+    _id: `product_${i}`,
+    name: `Product ${i}`,
+    price: Math.random() * 100,
+    category: ["electronics", "books", "clothing"][i % 3],
+    in_stock: Math.random() > 0.5
+  });
+}
+
+const lsn = await client.collection("products").upsert(documents);
+console.log(`Batch upserted ${documents.length} documents at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+import random
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Prepare a large batch of documents
+documents = []
+for i in range(1000):
+    documents.append({
+        "_id": f"product_{i}",
+        "name": f"Product {i}",
+        "price": random.random() * 100,
+        "category": ["electronics", "books", "clothing"][i % 3],
+        "in_stock": random.random() > 0.5
+    })
+
+lsn = client.collection("products").upsert(documents)
+print(f"Batch upserted {len(documents)} documents at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Replacing Existing Documents
+
+<Warning>
+  When you upsert a document with an existing `_id`, the entire document is replaced. Fields from the old document that are not included in the new document will be removed.
+</Warning>
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// First upsert
+await client.collection("books").upsert([{
+  _id: "book_1",
+  title: "Original Title",
+  author: "Original Author",
+  year: 2020
+}]);
+
+// Second upsert - replaces the entire document
+await client.collection("books").upsert([{
+  _id: "book_1",
+  title: "Updated Title",
+  author: "Updated Author"
+  // Note: 'year' field will be removed
+}]);
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# First upsert
+client.collection("books").upsert([{
+    "_id": "book_1",
+    "title": "Original Title",
+    "author": "Original Author",
+    "year": 2020
+}])
+
+# Second upsert - replaces the entire document
+client.collection("books").upsert([{
+    "_id": "book_1",
+    "title": "Updated Title",
+    "author": "Updated Author"
+    # Note: 'year' field will be removed
+}])
+```
+</CodeGroup>
+
+<Note>
+  If you want to merge fields instead of replacing the entire document, use the [`update()`](/documents/update) method instead.
+</Note>
+
+## Best Practices
+
+1. **Batch Operations**: For better performance, upsert multiple documents in a single call rather than making individual calls for each document.
+
+2. **Unique IDs**: Ensure each `_id` is unique within your collection. Use meaningful identifiers that help you reference documents later.
+
+3. **Vector Data**: Use the appropriate data constructor functions (`f32Vector`, `f32SparseVector`, etc.) when including vector embeddings in your documents.
+
+4. **Schema Compliance**: Make sure your documents conform to the collection's schema, especially for required fields.
+
+## Related Methods
+
+- [`update()`](/documents/update) - Merge updates into existing documents without replacing them
+- [`get()`](/documents/get) - Retrieve documents by their IDs
+- [`delete()`](/documents/delete) - Remove documents from the collection
+- [`query()`](/documents/query) - Search and filter documents

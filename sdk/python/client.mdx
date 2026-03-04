@@ -1,0 +1,410 @@
+---
+title: "Client"
+description: "Python SDK client for interacting with the TopK API"
+---
+
+## Client
+
+The `Client` class is the main entry point for interacting with the TopK API. Use it to manage collections and perform data operations.
+
+### Constructor
+
+```python
+from topk_sdk import Client
+
+client = Client(
+    api_key="YOUR_TOPK_API_KEY",
+    region="aws-us-east-1-elastica"
+)
+```
+
+<ParamField path="api_key" type="str" required>
+  Your TopK API key. Get one from the [TopK Console](https://console.topk.io).
+</ParamField>
+
+<ParamField path="region" type="str" required>
+  The region where your data is stored. For available regions, see the [regions documentation](https://docs.topk.io/regions).
+</ParamField>
+
+<ParamField path="host" type="str" default="topk.io">
+  The TopK API host. Typically this should not be changed.
+</ParamField>
+
+<ParamField path="https" type="bool" default="true">
+  Whether to use HTTPS for connections.
+</ParamField>
+
+<ParamField path="retry_config" type="RetryConfig | dict">
+  Configuration for retry behavior. See [RetryConfig](#retryconfig) below.
+</ParamField>
+
+### Methods
+
+#### collection()
+
+Get a client for managing data operations on a specific collection such as querying, upserting, and deleting documents.
+
+```python
+collection_client = client.collection("books")
+```
+
+<ParamField path="collection" type="str" required>
+  The name of the collection to interact with.
+</ParamField>
+
+<ResponseField name="return" type="CollectionClient">
+  A client instance for the specified collection.
+</ResponseField>
+
+#### collections()
+
+Get a client for managing collections (create, list, get, delete).
+
+```python
+collections_client = client.collections()
+```
+
+<ResponseField name="return" type="CollectionsClient">
+  A client instance for managing collections.
+</ResponseField>
+
+---
+
+## AsyncClient
+
+Asynchronous client for interacting with the TopK API. All operations return awaitables.
+
+### Constructor
+
+```python
+from topk_sdk import AsyncClient
+
+client = AsyncClient(
+    api_key="YOUR_TOPK_API_KEY",
+    region="aws-us-east-1-elastica"
+)
+```
+
+Parameters are identical to the synchronous `Client`.
+
+### Methods
+
+#### collection()
+
+Get an async client for a specific collection.
+
+```python
+collection_client = client.collection("books")
+```
+
+<ParamField path="collection" type="str" required>
+  The name of the collection to interact with.
+</ParamField>
+
+<ResponseField name="return" type="AsyncCollectionClient">
+  An async client instance for the specified collection.
+</ResponseField>
+
+#### collections()
+
+Get an async client for managing collections.
+
+```python
+collections_client = client.collections()
+```
+
+<ResponseField name="return" type="AsyncCollectionsClient">
+  An async client instance for managing collections.
+</ResponseField>
+
+---
+
+## CollectionClient
+
+Synchronous client for collection operations like querying, upserting, and deleting documents.
+
+### get()
+
+Get documents by their IDs.
+
+```python
+documents = client.collection("books").get(
+    ids=["gatsby", "1984"],
+    fields=["title", "author"]
+)
+```
+
+<ParamField path="ids" type="Sequence[str]" required>
+  List of document IDs to retrieve.
+</ParamField>
+
+<ParamField path="fields" type="Sequence[str]">
+  Optional list of field names to return. If not provided, all fields are returned.
+</ParamField>
+
+<ParamField path="lsn" type="str">
+  Log Sequence Number for consistency. Wait for writes up to this LSN to be available.
+</ParamField>
+
+<ParamField path="consistency" type="ConsistencyLevel">
+  Consistency level for the operation. Can be `ConsistencyLevel.Strong` or `ConsistencyLevel.Indexed`.
+</ParamField>
+
+<ResponseField name="return" type="dict[str, dict[str, Any]]">
+  A dictionary mapping document IDs to their field values.
+</ResponseField>
+
+### count()
+
+Get the count of documents in the collection.
+
+```python
+total = client.collection("books").count()
+```
+
+<ParamField path="lsn" type="str">
+  Log Sequence Number for consistency.
+</ParamField>
+
+<ParamField path="consistency" type="ConsistencyLevel">
+  Consistency level for the operation.
+</ParamField>
+
+<ResponseField name="return" type="int">
+  The number of documents in the collection.
+</ResponseField>
+
+### query()
+
+Execute a query against the collection.
+
+```python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+    select(
+        "title",
+        similarity=fn.semantic_similarity("title", "classic novel")
+    ).topk(field("similarity"), 10)
+)
+```
+
+<ParamField path="query" type="Query" required>
+  The query to execute. See the [Query documentation](/sdk/python/query) for details.
+</ParamField>
+
+<ParamField path="lsn" type="str">
+  Log Sequence Number for consistency.
+</ParamField>
+
+<ParamField path="consistency" type="ConsistencyLevel">
+  Consistency level for the operation.
+</ParamField>
+
+<ResponseField name="return" type="list[dict[str, Any]]">
+  A list of documents matching the query.
+</ResponseField>
+
+### upsert()
+
+Insert or update documents in the collection. Each document must have an `_id` field.
+
+```python
+lsn = client.collection("books").upsert([
+    {"_id": "gatsby", "title": "The Great Gatsby", "year": 1925},
+    {"_id": "1984", "title": "1984", "year": 1949}
+])
+```
+
+<ParamField path="documents" type="Sequence[Mapping[str, Any]]" required>
+  List of documents to insert or update. Each document must contain an `_id` field.
+</ParamField>
+
+<ResponseField name="return" type="str">
+  The LSN (Log Sequence Number) at which the upsert was applied.
+</ResponseField>
+
+### update()
+
+Update documents in the collection. Existing documents will be merged with the provided fields. Missing documents will be ignored.
+
+```python
+lsn = client.collection("books").update(
+    [{"_id": "gatsby", "year": 1926}],
+    fail_on_missing=False
+)
+```
+
+<ParamField path="documents" type="Sequence[Mapping[str, Any]]" required>
+  List of documents to update. Each document must contain an `_id` field.
+</ParamField>
+
+<ParamField path="fail_on_missing" type="bool">
+  If true, the operation fails if any document IDs don't exist.
+</ParamField>
+
+<ResponseField name="return" type="str">
+  The LSN at which the update was applied. If no updates were applied, this will be empty.
+</ResponseField>
+
+### delete()
+
+Delete documents by their IDs or using a filter expression.
+
+<Tabs>
+  <Tab title="By IDs">
+    ```python
+    lsn = client.collection("books").delete(["id_1", "id_2"])
+    ```
+  </Tab>
+  <Tab title="By Filter">
+    ```python
+    from topk_sdk.query import field
+
+    lsn = client.collection("books").delete(
+        field("published_year").gt(1997)
+    )
+    ```
+  </Tab>
+</Tabs>
+
+<ParamField path="expr" type="Sequence[str] | LogicalExpr" required>
+  Either a list of document IDs to delete, or a filter expression.
+</ParamField>
+
+<ResponseField name="return" type="str">
+  The LSN at which the delete was applied.
+</ResponseField>
+
+---
+
+## AsyncCollectionClient
+
+Asynchronous client for collection operations. All methods are identical to `CollectionClient` but return awaitables.
+
+```python
+from topk_sdk import AsyncClient
+from topk_sdk.query import select, field, fn
+
+client = AsyncClient(api_key="YOUR_KEY", region="aws-us-east-1-elastica")
+
+# All operations must be awaited
+documents = await client.collection("books").get(["gatsby", "1984"])
+results = await client.collection("books").query(
+    select("title").topk(fn.semantic_similarity("title", "novel"), 10)
+)
+```
+
+---
+
+## Collection
+
+Represents a collection in the TopK system. Returned by `CollectionsClient.get()` and `CollectionsClient.list()`.
+
+<ResponseField name="name" type="str">
+  The name of the collection.
+</ResponseField>
+
+<ResponseField name="org_id" type="str">
+  The organization ID that owns the collection.
+</ResponseField>
+
+<ResponseField name="project_id" type="str">
+  The project ID that owns the collection.
+</ResponseField>
+
+<ResponseField name="region" type="str">
+  The region where the collection is stored.
+</ResponseField>
+
+<ResponseField name="schema" type="dict[str, FieldSpec]">
+  The schema definition for the collection. See [Schema documentation](/sdk/python/schema) for details.
+</ResponseField>
+
+---
+
+## ConsistencyLevel
+
+Enumeration of consistency levels for operations.
+
+```python
+from topk_sdk import ConsistencyLevel
+
+# Use Strong consistency
+client.collection("books").get(
+    ["id_1"],
+    consistency=ConsistencyLevel.Strong
+)
+```
+
+<ResponseField name="Strong" type="ConsistencyLevel">
+  Strong consistency ensures reads reflect all writes acknowledged before the read operation.
+</ResponseField>
+
+<ResponseField name="Indexed" type="ConsistencyLevel">
+  Indexed consistency ensures reads reflect all indexed writes.
+</ResponseField>
+
+---
+
+## RetryConfig
+
+Configuration for retry behavior.
+
+By default, retries occur in two situations:
+1. When the server requests the client to reduce its request rate, resulting in a `SlowDownError`.
+2. When using `query(..., lsn=N)` to wait for writes to be available.
+
+```python
+from topk_sdk import Client, RetryConfig
+
+client = Client(
+    api_key="YOUR_KEY",
+    region="aws-us-east-1-elastica",
+    retry_config=RetryConfig(
+        max_retries=5,
+        timeout=60000,
+        backoff=BackoffConfig(base=2, init_backoff=200)
+    )
+)
+```
+
+<ParamField path="max_retries" type="int" default="3">
+  Maximum number of retries to attempt.
+</ParamField>
+
+<ParamField path="timeout" type="int" default="30000">
+  The total timeout for the retry chain in milliseconds. Default is 30,000 milliseconds (30 seconds).
+</ParamField>
+
+<ParamField path="backoff" type="BackoffConfig">
+  The backoff configuration for the client. See [BackoffConfig](#backoffconfig) below.
+</ParamField>
+
+---
+
+## BackoffConfig
+
+Configuration for backoff behavior in retries.
+
+```python
+from topk_sdk import BackoffConfig
+
+backoff = BackoffConfig(
+    base=2,
+    init_backoff=100,
+    max_backoff=10000
+)
+```
+
+<ParamField path="base" type="int" default="2">
+  The base for the exponential backoff. Default is 2x backoff.
+</ParamField>
+
+<ParamField path="init_backoff" type="int" default="100">
+  The initial backoff in milliseconds. Default is 100 milliseconds.
+</ParamField>
+
+<ParamField path="max_backoff" type="int" default="10000">
+  The maximum backoff in milliseconds. Default is 10,000 milliseconds (10 seconds).
+</ParamField>

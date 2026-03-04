@@ -1,0 +1,454 @@
+---
+title: "Data"
+description: "Data types for vectors, matrices, and lists in the TopK Python SDK"
+---
+
+The data module provides functions to create specialized data types for vectors, sparse vectors, matrices, and typed lists.
+
+## Overview
+
+When upserting documents with vector or matrix data, you can use Python's native types (lists, dicts) or specialized constructors from the `data` module for explicit type control.
+
+```python
+from topk_sdk.data import f32_vector, f32_sparse_vector, matrix
+
+client.collection("books").upsert([
+    {
+        "_id": "1",
+        "title": "The Great Gatsby",
+        "embedding": f32_vector([0.1, 0.2, 0.3, ...]),
+        "sparse_features": f32_sparse_vector({0: 0.5, 10: 0.8}),
+        "multi_embeddings": matrix([[0.1, 0.2], [0.3, 0.4]], "f32")
+    }
+])
+```
+
+---
+
+## Classes
+
+### List
+
+Represents typed lists and vectors in TopK. Created by vector and list constructor functions.
+
+```python
+from topk_sdk.data import f32_vector, u8_vector
+
+# Create typed vectors
+float_vec = f32_vector([0.1, 0.2, 0.3])
+int_vec = u8_vector([1, 2, 3, 4, 5])
+```
+
+### SparseVector
+
+Represents sparse vectors in TopK. Created by sparse vector constructor functions.
+
+```python
+from topk_sdk.data import f32_sparse_vector, u8_sparse_vector
+
+# Create sparse vectors (dict of index -> value)
+float_sparse = f32_sparse_vector({0: 0.5, 100: 0.8, 500: 0.3})
+int_sparse = u8_sparse_vector({0: 5, 50: 10, 200: 15})
+```
+
+### Matrix
+
+Represents matrices (multi-vector fields) in TopK. Created by the `matrix()` constructor.
+
+```python
+from topk_sdk.data import matrix
+import numpy as np
+
+# Create from list of lists
+mat = matrix([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], "f32")
+
+# Create from numpy array
+np_mat = matrix(np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32))
+```
+
+---
+
+## Dense Vectors
+
+### f8_vector()
+
+Create an 8-bit float vector.
+
+```python
+from topk_sdk.data import f8_vector
+
+vector = f8_vector([0.12, 0.67, 0.82, 0.53])
+```
+
+<ParamField path="data" type="list[float]" required>
+  List of float values for the vector.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  An 8-bit float vector.
+</ResponseField>
+
+### f16_vector()
+
+Create a 16-bit float vector.
+
+```python
+from topk_sdk.data import f16_vector
+
+vector = f16_vector([0.12, 0.67, 0.82, 0.53])
+```
+
+<ParamField path="data" type="list[float]" required>
+  List of float values for the vector.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A 16-bit float vector.
+</ResponseField>
+
+### f32_vector()
+
+Create a 32-bit float vector. This is an alias for `f32_list()`.
+
+```python
+from topk_sdk.data import f32_vector
+
+vector = f32_vector([0.12, 0.67, 0.82, 0.53])
+```
+
+<ParamField path="data" type="list[float]" required>
+  List of float values for the vector.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A 32-bit float vector.
+</ResponseField>
+
+### u8_vector()
+
+Create an 8-bit unsigned integer vector. This is an alias for `u8_list()`.
+
+```python
+from topk_sdk.data import u8_vector
+
+vector = u8_vector([0, 255, 1, 2, 3])
+```
+
+<ParamField path="data" type="list[int]" required>
+  List of integer values (0-255) for the vector.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  An 8-bit unsigned integer vector.
+</ResponseField>
+
+### i8_vector()
+
+Create an 8-bit signed integer vector.
+
+```python
+from topk_sdk.data import i8_vector
+
+vector = i8_vector([-128, 127, -1, 0, 1])
+```
+
+<ParamField path="data" type="list[int]" required>
+  List of integer values (-128 to 127) for the vector.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  An 8-bit signed integer vector.
+</ResponseField>
+
+### binary_vector()
+
+Create a binary vector.
+
+```python
+from topk_sdk.data import binary_vector
+
+vector = binary_vector([0, 1, 1, 0, 1])
+```
+
+<ParamField path="data" type="list[int]" required>
+  List of binary values (0 or 1).
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A binary vector.
+</ResponseField>
+
+---
+
+## Sparse Vectors
+
+### f32_sparse_vector()
+
+Create a 32-bit float sparse vector.
+
+<Note>
+Sparse vectors use u32 dimension indices to support dictionaries of up to 2^32 - 1 terms.
+</Note>
+
+```python
+from topk_sdk.data import f32_sparse_vector
+
+sparse = f32_sparse_vector({0: 0.12, 6: 0.67, 17: 0.82, 97: 0.53})
+```
+
+<ParamField path="data" type="dict[int, float]" required>
+  Dictionary mapping dimension indices to float values.
+</ParamField>
+
+<ResponseField name="return" type="SparseVector">
+  A 32-bit float sparse vector.
+</ResponseField>
+
+### u8_sparse_vector()
+
+Create an 8-bit unsigned integer sparse vector.
+
+```python
+from topk_sdk.data import u8_sparse_vector
+
+sparse = u8_sparse_vector({0: 12, 6: 67, 17: 82, 97: 53})
+```
+
+<ParamField path="data" type="dict[int, int]" required>
+  Dictionary mapping dimension indices to integer values (0-255).
+</ParamField>
+
+<ResponseField name="return" type="SparseVector">
+  An 8-bit unsigned integer sparse vector.
+</ResponseField>
+
+---
+
+## Other Data Types
+
+### bytes()
+
+Create a bytes data object.
+
+```python
+from topk_sdk.data import bytes
+
+# From list of integers
+bytes_data = bytes([0, 1, 1, 0, 255])
+
+# From Python bytes
+bytes_data = bytes(b"\x00\x01\x01\x00\xff")
+```
+
+<ParamField path="data" type="list[int] | bytes" required>
+  Either a list of byte values (0-255) or a Python bytes object.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A bytes data object.
+</ResponseField>
+
+---
+
+## Typed Lists
+
+### u32_list()
+
+Create a list of 32-bit unsigned integers.
+
+```python
+from topk_sdk.data import u32_list
+
+list_data = u32_list([0, 1, 2, 3, 4294967295])
+```
+
+<ParamField path="data" type="list[int]" required>
+  List of unsigned integer values.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A list of 32-bit unsigned integers.
+</ResponseField>
+
+### i32_list()
+
+Create a list of 32-bit signed integers.
+
+```python
+from topk_sdk.data import i32_list
+
+list_data = i32_list([-2147483648, -1, 0, 1, 2147483647])
+```
+
+<ParamField path="data" type="list[int]" required>
+  List of signed integer values.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A list of 32-bit signed integers.
+</ResponseField>
+
+### i64_list()
+
+Create a list of 64-bit signed integers.
+
+```python
+from topk_sdk.data import i64_list
+
+list_data = i64_list([0, 1, 2, 3, 9223372036854775807])
+```
+
+<ParamField path="data" type="list[int]" required>
+  List of signed 64-bit integer values.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A list of 64-bit signed integers.
+</ResponseField>
+
+### f32_list()
+
+Create a list of 32-bit floating point numbers.
+
+```python
+from topk_sdk.data import f32_list
+
+list_data = f32_list([0.12, 0.67, 0.82, 0.53])
+```
+
+<ParamField path="data" type="list[float]" required>
+  List of float values.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A list of 32-bit floats.
+</ResponseField>
+
+### f64_list()
+
+Create a list of 64-bit floating point numbers.
+
+```python
+from topk_sdk.data import f64_list
+
+list_data = f64_list([0.12, 0.67, 0.82, 0.53])
+```
+
+<ParamField path="data" type="list[float]" required>
+  List of float values.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A list of 64-bit floats.
+</ResponseField>
+
+### string_list()
+
+Create a list of strings.
+
+```python
+from topk_sdk.data import string_list
+
+list_data = string_list(["foo", "bar", "baz"])
+```
+
+<ParamField path="data" type="list[str]" required>
+  List of string values.
+</ParamField>
+
+<ResponseField name="return" type="List">
+  A list of strings.
+</ResponseField>
+
+---
+
+## Matrix
+
+### matrix()
+
+Create a matrix (multi-vector field) for use with multi-vector indexes.
+
+The `values` parameter can be:
+- **List of lists**: Defaults to f32, or specify `value_type` explicitly
+- **Numpy array**: Type inferred from array's dtype (float32, float16, uint8, int8)
+
+```python
+from topk_sdk.data import matrix
+import numpy as np
+
+# List of lists with explicit type
+mat1 = matrix([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], "f32")
+
+# List of lists defaults to f32
+mat2 = matrix([[1.0, 2.0], [3.0, 4.0]])
+
+# Numpy array infers type from dtype
+mat3 = matrix(np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float16))
+
+# uint8 matrix
+mat4 = matrix([[1, 2, 3], [4, 5, 6]], "u8")
+```
+
+<ParamField path="values" type="list[list[float]] | list[list[int]] | ndarray" required>
+  The matrix values. Can be a list of lists or a numpy array.
+</ParamField>
+
+<ParamField path="value_type" type="Literal['f32', 'f16', 'f8', 'u8', 'i8']">
+  The data type for matrix elements. Required when using list of lists (unless you want default f32). Ignored when using numpy arrays (type inferred from dtype).
+  
+  Options:
+  - `"f32"` - 32-bit float (default)
+  - `"f16"` - 16-bit float
+  - `"f8"` - 8-bit float
+  - `"u8"` - 8-bit unsigned integer
+  - `"i8"` - 8-bit signed integer
+</ParamField>
+
+<ResponseField name="return" type="Matrix">
+  A matrix object.
+</ResponseField>
+
+---
+
+## Complete Example
+
+```python
+from topk_sdk import Client
+from topk_sdk.data import (
+    f32_vector, f16_vector, u8_vector,
+    f32_sparse_vector, u8_sparse_vector,
+    matrix, bytes, string_list, f32_list
+)
+import numpy as np
+
+client = Client(api_key="YOUR_KEY", region="aws-us-east-1-elastica")
+
+# Upsert documents with various data types
+client.collection("products").upsert([
+    {
+        "_id": "product_1",
+        "name": "Wireless Headphones",
+        
+        # Dense vectors
+        "image_embedding_f32": f32_vector([0.1, 0.2, 0.3]),
+        "image_embedding_f16": f16_vector([0.1, 0.2, 0.3]),
+        "quantized_embedding": u8_vector([10, 20, 30, 40]),
+        
+        # Sparse vectors
+        "tfidf_features": f32_sparse_vector({0: 0.5, 100: 0.8, 500: 0.3}),
+        "bow_features": u8_sparse_vector({0: 5, 50: 10, 200: 15}),
+        
+        # Matrix (multi-vector)
+        "colbert_embeddings": matrix(
+            np.random.rand(10, 128).astype(np.float32)
+        ),
+        
+        # Other types
+        "thumbnail": bytes(b"\x89PNG\r\n..."),
+        "tags": string_list(["electronics", "audio", "wireless"]),
+        "ratings": f32_list([4.5, 4.8, 4.2, 4.9])
+    }
+])
+
+print("Documents upserted successfully")
+```

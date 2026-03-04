@@ -1,0 +1,255 @@
+---
+title: Delete Collection
+description: Permanently delete a collection and all its data
+---
+
+Deletes a collection and all the documents it contains. This operation cannot be undone.
+
+<Warning>
+  This operation is **irreversible** and will permanently delete all data in the collection. Make sure you have a backup if needed before proceeding.
+</Warning>
+
+## Method Signature
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    collections().delete(name: string): Promise<void>
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    collections().delete(collection_name: str) -> None
+    ```
+  </Tab>
+</Tabs>
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  The name of the collection to delete.
+</ParamField>
+
+## Returns
+
+This method returns `void` and does not produce a return value. If the operation succeeds, the collection and all its data are permanently deleted.
+
+## Examples
+
+### Delete a Collection
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    await client.collections().delete("books");
+    console.log("Collection deleted successfully");
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    client.collections().delete("books")
+    print("Collection deleted successfully")
+    ```
+  </Tab>
+</Tabs>
+
+### Delete with Confirmation
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+    import * as readline from "readline";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    async function deleteWithConfirmation(collectionName) {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+
+      return new Promise((resolve) => {
+        rl.question(
+          `Are you sure you want to delete '${collectionName}'? (yes/no): `,
+          async (answer) => {
+            rl.close();
+            
+            if (answer.toLowerCase() === "yes") {
+              await client.collections().delete(collectionName);
+              console.log("Collection deleted successfully");
+              resolve(true);
+            } else {
+              console.log("Deletion cancelled");
+              resolve(false);
+            }
+          }
+        );
+      });
+    }
+
+    await deleteWithConfirmation("books");
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    def delete_with_confirmation(collection_name: str):
+      answer = input(
+        f"Are you sure you want to delete '{collection_name}'? (yes/no): "
+      )
+      
+      if answer.lower() == "yes":
+        client.collections().delete(collection_name)
+        print("Collection deleted successfully")
+        return True
+      else:
+        print("Deletion cancelled")
+        return False
+
+    delete_with_confirmation("books")
+    ```
+  </Tab>
+</Tabs>
+
+### Delete Multiple Collections
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    const collectionsToDelete = ["temp_collection_1", "temp_collection_2", "test_collection"];
+
+    for (const name of collectionsToDelete) {
+      try {
+        await client.collections().delete(name);
+        console.log(`Deleted: ${name}`);
+      } catch (error) {
+        console.error(`Failed to delete ${name}: ${error.message}`);
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    collections_to_delete = ["temp_collection_1", "temp_collection_2", "test_collection"]
+
+    for name in collections_to_delete:
+      try:
+        client.collections().delete(name)
+        print(f"Deleted: {name}")
+      except Exception as error:
+        print(f"Failed to delete {name}: {error}")
+    ```
+  </Tab>
+</Tabs>
+
+### Safe Delete with Existence Check
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+
+    const client = new Client({
+      apiKey: process.env.TOPK_API_KEY,
+      region: "us-east-1"
+    });
+
+    async function safeDelete(collectionName) {
+      try {
+        // Check if collection exists first
+        await client.collections().get(collectionName);
+        
+        // Delete if it exists
+        await client.collections().delete(collectionName);
+        console.log(`Deleted collection: ${collectionName}`);
+        return true;
+      } catch (error) {
+        if (error.message.includes("not found")) {
+          console.log(`Collection '${collectionName}' does not exist`);
+          return false;
+        }
+        throw error;
+      }
+    }
+
+    await safeDelete("books");
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    import os
+
+    client = Client(
+      api_key=os.environ["TOPK_API_KEY"],
+      region="us-east-1"
+    )
+
+    def safe_delete(collection_name: str) -> bool:
+      try:
+        # Check if collection exists first
+        client.collections().get(collection_name)
+        
+        # Delete if it exists
+        client.collections().delete(collection_name)
+        print(f"Deleted collection: {collection_name}")
+        return True
+      except Exception as error:
+        if "not found" in str(error):
+          print(f"Collection '{collection_name}' does not exist")
+          return False
+        raise
+
+    safe_delete("books")
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  **Data Loss Warning**: Once a collection is deleted, all documents, indexes, and metadata are permanently removed. This operation cannot be reversed. Always ensure you have backups of critical data before deleting a collection.
+</Warning>
+
+<Note>
+  If the collection does not exist, this method may throw an error depending on the implementation. Consider using error handling to manage this case.
+</Note>

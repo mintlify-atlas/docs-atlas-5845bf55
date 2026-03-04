@@ -1,0 +1,439 @@
+---
+title: "Get Documents"
+description: "Retrieve documents by their IDs from a TopK collection"
+---
+
+## Overview
+
+The `get()` method retrieves documents from a collection by their unique `_id` values. This is the most efficient way to fetch documents when you know their identifiers.
+
+## Method Signature
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    get(
+      ids: Array<string>,
+      fields?: Array<string> | null,
+      options?: QueryOptions | null
+    ): Promise<Record<string, Record<string, any>>>
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    def get(
+        ids: Sequence[str],
+        fields: Optional[Sequence[str]] = None,
+        lsn: Optional[str] = None,
+        consistency: Optional[ConsistencyLevel] = None
+    ) -> dict[str, dict[str, Any]]:
+        """Get documents by their IDs."""
+    ```
+  </Tab>
+</Tabs>
+
+## Parameters
+
+<ParamField path="ids" type="Array<string>" required>
+  An array of document IDs to retrieve.
+</ParamField>
+
+<ParamField path="fields" type="Array<string>">
+  Optional array of field names to return. If not specified, all fields are returned.
+</ParamField>
+
+<ParamField path="options" type="QueryOptions">
+  Optional query options:
+  - `lsn`: Wait for writes up to this Log Sequence Number before retrieving documents
+  - `consistency`: Consistency level (`'indexed'` or `'strong'`)
+</ParamField>
+
+## Returns
+
+<ResponseField name="documents" type="Record<string, Record<string, any>>">
+  A dictionary mapping document IDs to their document objects. Only documents that exist in the collection are included in the result.
+</ResponseField>
+
+<Note>
+  If a requested ID doesn't exist in the collection, it will simply be omitted from the returned dictionary. No error is raised for missing documents.
+</Note>
+
+## Examples
+
+### Basic Get
+
+Retrieve specific documents by their IDs.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const documents = await client.collection("books").get([
+  "book_1",
+  "book_2",
+  "book_3"
+]);
+
+// Access documents by ID
+if (documents["book_1"]) {
+  console.log(`Title: ${documents["book_1"].title}`);
+  console.log(`Author: ${documents["book_1"].author}`);
+}
+
+// Iterate over all returned documents
+for (const [id, doc] of Object.entries(documents)) {
+  console.log(`${id}: ${doc.title}`);
+}
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+documents = client.collection("books").get([
+    "book_1",
+    "book_2",
+    "book_3"
+])
+
+# Access documents by ID
+if "book_1" in documents:
+    print(f"Title: {documents['book_1']['title']}")
+    print(f"Author: {documents['book_1']['author']}")
+
+# Iterate over all returned documents
+for doc_id, doc in documents.items():
+    print(f"{doc_id}: {doc['title']}")
+```
+</CodeGroup>
+
+### Get with Field Selection
+
+Retrieve only specific fields to reduce data transfer.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Only fetch title and author fields
+const documents = await client.collection("books").get(
+  ["book_1", "book_2", "book_3"],
+  ["title", "author"]
+);
+
+console.log(documents["book_1"]);
+// Output: { title: "...", author: "..." }
+// Note: Other fields like _id, year, etc. are not included
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Only fetch title and author fields
+documents = client.collection("books").get(
+    ["book_1", "book_2", "book_3"],
+    fields=["title", "author"]
+)
+
+print(documents["book_1"])
+# Output: {'title': '...', 'author': '...'}
+# Note: Other fields like _id, year, etc. are not included
+```
+</CodeGroup>
+
+### Get with Consistency Guarantees
+
+Ensure you read the latest version of documents.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Perform an update and get the LSN
+const lsn = await client.collection("books").upsert([{
+  _id: "book_1",
+  title: "Updated Title",
+  author: "Original Author"
+}]);
+
+// Retrieve with consistency guarantee
+const documents = await client.collection("books").get(
+  ["book_1"],
+  null,
+  { lsn: lsn, consistency: 'strong' }
+);
+
+console.log(documents["book_1"].title); // "Updated Title"
+```
+
+```python Python
+from topk_sdk import Client, ConsistencyLevel
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Perform an update and get the LSN
+lsn = client.collection("books").upsert([{
+    "_id": "book_1",
+    "title": "Updated Title",
+    "author": "Original Author"
+}])
+
+# Retrieve with consistency guarantee
+documents = client.collection("books").get(
+    ["book_1"],
+    lsn=lsn,
+    consistency=ConsistencyLevel.Strong
+)
+
+print(documents["book_1"]["title"])  # "Updated Title"
+```
+</CodeGroup>
+
+### Handling Missing Documents
+
+Gracefully handle cases where some requested documents don't exist.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const requestedIds = ["book_1", "book_2", "book_999"];
+const documents = await client.collection("books").get(requestedIds);
+
+// Check which documents were found
+const foundIds = Object.keys(documents);
+const missingIds = requestedIds.filter(id => !documents[id]);
+
+console.log(`Found ${foundIds.length} documents`);
+console.log(`Missing ${missingIds.length} documents: ${missingIds.join(", ")}`);
+
+// Process only found documents
+for (const [id, doc] of Object.entries(documents)) {
+  console.log(`${id}: ${doc.title}`);
+}
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+requested_ids = ["book_1", "book_2", "book_999"]
+documents = client.collection("books").get(requested_ids)
+
+# Check which documents were found
+found_ids = list(documents.keys())
+missing_ids = [id for id in requested_ids if id not in documents]
+
+print(f"Found {len(found_ids)} documents")
+print(f"Missing {len(missing_ids)} documents: {', '.join(missing_ids)}")
+
+# Process only found documents
+for doc_id, doc in documents.items():
+    print(f"{doc_id}: {doc['title']}")
+```
+</CodeGroup>
+
+### Batch Retrieval
+
+Fetch a large number of documents efficiently.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Generate IDs for 100 products
+const productIds = Array.from(
+  { length: 100 },
+  (_, i) => `product_${i}`
+);
+
+// Fetch all products in one call
+const products = await client.collection("products").get(
+  productIds,
+  ["name", "price", "in_stock"]
+);
+
+console.log(`Retrieved ${Object.keys(products).length} products`);
+
+// Calculate statistics
+const inStock = Object.values(products)
+  .filter(p => p.in_stock)
+  .length;
+
+console.log(`${inStock} products in stock`);
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Generate IDs for 100 products
+product_ids = [f"product_{i}" for i in range(100)]
+
+# Fetch all products in one call
+products = client.collection("products").get(
+    product_ids,
+    fields=["name", "price", "in_stock"]
+)
+
+print(f"Retrieved {len(products)} products")
+
+# Calculate statistics
+in_stock = sum(1 for p in products.values() if p.get("in_stock"))
+print(f"{in_stock} products in stock")
+```
+</CodeGroup>
+
+### Get Single Document
+
+Retrieve a single document by ID.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const documents = await client.collection("books").get(["book_1"]);
+
+if (documents["book_1"]) {
+  const book = documents["book_1"];
+  console.log(`Found: ${book.title} by ${book.author}`);
+} else {
+  console.log("Book not found");
+}
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+documents = client.collection("books").get(["book_1"])
+
+if "book_1" in documents:
+    book = documents["book_1"]
+    print(f"Found: {book['title']} by {book['author']}")
+else:
+    print("Book not found")
+```
+</CodeGroup>
+
+### Retrieving Vector Embeddings
+
+Fetch documents including their vector embeddings.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const documents = await client.collection("books").get(
+  ["book_1", "book_2"],
+  ["title", "embedding"]
+);
+
+for (const [id, doc] of Object.entries(documents)) {
+  console.log(`${doc.title}: ${doc.embedding.length} dimensions`);
+}
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+documents = client.collection("books").get(
+    ["book_1", "book_2"],
+    fields=["title", "embedding"]
+)
+
+for doc_id, doc in documents.items():
+    print(f"{doc['title']}: {len(doc['embedding'])} dimensions")
+```
+</CodeGroup>
+
+## Performance Considerations
+
+1. **Field Selection**: When you only need specific fields, use the `fields` parameter to reduce data transfer time and bandwidth.
+
+2. **Batch Requests**: Fetching multiple documents in a single `get()` call is much more efficient than making multiple individual calls.
+
+3. **Consistency Trade-offs**: The default `'indexed'` consistency level offers better performance. Use `'strong'` consistency only when you need guaranteed up-to-date reads.
+
+4. **Missing Documents**: The `get()` method handles missing documents gracefully by omitting them from results. Always check if a document ID exists in the returned dictionary before accessing it.
+
+## Best Practices
+
+1. **Use Get for Known IDs**: When you know the exact document IDs, `get()` is faster than using `query()` with filters.
+
+2. **Limit Fields**: Always specify the `fields` parameter when you don't need all document data.
+
+3. **Handle Missing Documents**: Always check if a document exists in the result before accessing it to avoid errors.
+
+4. **Batch Operations**: Retrieve multiple documents in a single call rather than making separate calls for each document.
+
+## Related Methods
+
+- [`query()`](/documents/query) - Search for documents using complex queries
+- [`upsert()`](/documents/upsert) - Insert or update documents
+- [`update()`](/documents/update) - Update existing documents
+- [`delete()`](/documents/delete) - Remove documents from the collection

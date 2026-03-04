@@ -1,0 +1,425 @@
+---
+title: Multi-Vector Search
+description: Search using multiple embeddings per document with MaxSim
+---
+
+Multi-vector search allows you to store multiple embedding vectors per document (as a matrix) and perform late-interaction searches using MaxSim scoring. This is ideal for token-level embeddings, ColBERT-style models, or any scenario where you need multiple vectors to represent a single document.
+
+## Overview
+
+With multi-vector search, you can:
+- Store a matrix of embeddings per document (e.g., one per token)
+- Use MaxSim (maximum similarity) for late-interaction retrieval
+- Support various matrix value types (f32, f16, f8, u8, i8)
+- Optimize with quantization and sketch-based indexing
+- Control candidate selection for better speed/accuracy tradeoff
+
+## Schema Setup
+
+Define a matrix field with a `multiVectorIndex()`:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { Client } from "topk-js";
+import { matrix, multiVectorIndex, text } from "topk-js/schema";
+
+const client = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+await client.collections().create("documents", {
+  title: text(),
+  token_embeddings: matrix({ 
+    dimension: 128,  // Dimension of each vector
+    valueType: "f32" 
+  }).index(
+    multiVectorIndex({ metric: "maxsim" })
+  )
+});
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.schema import matrix, multi_vector_index, text
+
+client = Client(
+  api_key="YOUR_API_KEY",
+  region="aws-us-east-1-elastica"
+)
+
+client.collections().create("documents", schema={
+  "title": text(),
+  "token_embeddings": matrix(
+    dimension=128,  # Dimension of each vector
+    value_type="f32"
+  ).index(
+    multi_vector_index(metric="maxsim")
+  )
+})
+```
+
+</CodeGroup>
+
+### Matrix Value Types
+
+TopK supports multiple matrix value types:
+
+- `f32` - 32-bit floating point (standard precision)
+- `f16` - 16-bit floating point (half precision)
+- `f8` - 8-bit floating point
+- `u8` - 8-bit unsigned integer
+- `i8` - 8-bit signed integer
+
+<CodeGroup>
+
+```javascript JavaScript
+import { matrix, multiVectorIndex } from "topk-js/schema";
+
+const schema = {
+  // Standard precision
+  embeddings_f32: matrix({ dimension: 128, valueType: "f32" })
+    .index(multiVectorIndex({ metric: "maxsim" })),
+  
+  // Half precision - 50% storage savings
+  embeddings_f16: matrix({ dimension: 128, valueType: "f16" })
+    .index(multiVectorIndex({ metric: "maxsim" })),
+  
+  // 8-bit quantized - 75% storage savings
+  embeddings_u8: matrix({ dimension: 128, valueType: "u8" })
+    .index(multiVectorIndex({ metric: "maxsim", quantization: "scalar" }))
+};
+```
+
+```python Python
+from topk_sdk.schema import matrix, multi_vector_index
+
+schema = {
+  # Standard precision
+  "embeddings_f32": matrix(dimension=128, value_type="f32")
+    .index(multi_vector_index(metric="maxsim")),
+  
+  # Half precision - 50% storage savings
+  "embeddings_f16": matrix(dimension=128, value_type="f16")
+    .index(multi_vector_index(metric="maxsim")),
+  
+  # 8-bit quantized - 75% storage savings
+  "embeddings_u8": matrix(dimension=128, value_type="u8")
+    .index(multi_vector_index(metric="maxsim", quantization="scalar"))
+}
+```
+
+</CodeGroup>
+
+### Index Options
+
+Customize the multi-vector index behavior:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { matrix, multiVectorIndex } from "topk-js/schema";
+
+const schema = {
+  token_embeddings: matrix({ dimension: 128, valueType: "f32" }).index(
+    multiVectorIndex({
+      metric: "maxsim",
+      sketchBits: 128,  // Number of bits for sketching (optional)
+      quantization: "1bit"  // 1bit, 2bit, or scalar (optional)
+    })
+  )
+};
+```
+
+```python Python
+from topk_sdk.schema import matrix, multi_vector_index
+
+schema = {
+  "token_embeddings": matrix(dimension=128, value_type="f32").index(
+    multi_vector_index(
+      metric="maxsim",
+      sketch_bits=128,  # Number of bits for sketching (optional)
+      quantization="1bit"  # 1bit, 2bit, or scalar (optional)
+    )
+  )
+}
+```
+
+</CodeGroup>
+
+<Note>
+MaxSim is currently the only supported metric for multi-vector search. It computes the maximum similarity between each query vector and all document vectors, then sums these maximum similarities.
+</Note>
+
+## Inserting Documents with Matrices
+
+Provide embeddings as a matrix (array of arrays):
+
+<CodeGroup>
+
+```javascript JavaScript
+import { matrix } from "topk-js/data";
+
+await client.collection("documents").upsert([
+  {
+    _id: "doc1",
+    title: "Machine Learning Basics",
+    // Each row is a token embedding (e.g., 5 tokens, 128 dimensions each)
+    token_embeddings: [
+      [0.1, 0.2, 0.3, /* ... 128 dimensions */],
+      [0.4, 0.5, 0.6, /* ... 128 dimensions */],
+      [0.7, 0.8, 0.9, /* ... 128 dimensions */],
+      [0.2, 0.3, 0.4, /* ... 128 dimensions */],
+      [0.5, 0.6, 0.7, /* ... 128 dimensions */]
+    ]
+  },
+  {
+    _id: "doc2",
+    title: "Deep Learning Guide",
+    // Explicit matrix constructor for non-f32 types
+    token_embeddings: matrix([
+      [12, 24, 36, /* ... */],
+      [48, 60, 72, /* ... */],
+      [84, 96, 108, /* ... */]
+    ], "u8")
+  }
+]);
+```
+
+```python Python
+from topk_sdk.data import matrix
+import numpy as np
+
+client.collection("documents").upsert([
+  {
+    "_id": "doc1",
+    "title": "Machine Learning Basics",
+    # Each row is a token embedding (e.g., 5 tokens, 128 dimensions each)
+    "token_embeddings": [
+      [0.1, 0.2, 0.3, # ... 128 dimensions
+      ],
+      [0.4, 0.5, 0.6, # ... 128 dimensions
+      ],
+      [0.7, 0.8, 0.9, # ... 128 dimensions
+      ],
+      [0.2, 0.3, 0.4, # ... 128 dimensions
+      ],
+      [0.5, 0.6, 0.7, # ... 128 dimensions
+      ]
+    ]
+  },
+  {
+    "_id": "doc2",
+    "title": "Deep Learning Guide",
+    # Can use numpy arrays
+    "token_embeddings": np.array([
+      [12, 24, 36, # ...
+      ],
+      [48, 60, 72, # ...
+      ],
+      [84, 96, 108, # ...
+      ]
+    ], dtype=np.uint8)
+  }
+])
+```
+
+</CodeGroup>
+
+## Querying with Multi-Vector Search
+
+Use `fn.multiVectorDistance()` to compute MaxSim scores:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+// Query with multiple token embeddings
+const queryTokens = [
+  [0.11, 0.22, 0.33, /* ... 128 dimensions */],
+  [0.44, 0.55, 0.66, /* ... 128 dimensions */],
+  [0.77, 0.88, 0.99, /* ... 128 dimensions */]
+];
+
+const results = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    score: fn.multiVectorDistance("token_embeddings", queryTokens)
+  })
+  .topk(field("score"), 10)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+# Query with multiple token embeddings
+query_tokens = [
+  [0.11, 0.22, 0.33, # ... 128 dimensions
+  ],
+  [0.44, 0.55, 0.66, # ... 128 dimensions
+  ],
+  [0.77, 0.88, 0.99, # ... 128 dimensions
+  ]
+]
+
+results = client.collection("documents").query(
+  select(
+    "title",
+    score=fn.multi_vector_distance("token_embeddings", query_tokens)
+  )
+  .topk(field("score"), 10)
+)
+```
+
+</CodeGroup>
+
+### Controlling Candidates
+
+Limit the number of candidate vectors considered for better performance:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    score: fn.multiVectorDistance(
+      "token_embeddings", 
+      queryTokens,
+      100  // Limit to 100 candidate vectors
+    )
+  })
+  .topk(field("score"), 10)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("documents").query(
+  select(
+    "title",
+    score=fn.multi_vector_distance(
+      "token_embeddings", 
+      query_tokens,
+      candidates=100  # Limit to 100 candidate vectors
+    )
+  )
+  .topk(field("score"), 10)
+)
+```
+
+</CodeGroup>
+
+<Tip>
+Reducing the number of candidates can significantly improve query performance, especially for large documents with many token embeddings. Start with a higher value and tune down for optimal speed/accuracy balance.
+</Tip>
+
+### Using Explicit Matrix Types
+
+For non-f32 matrix types, use the explicit matrix constructor:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { matrix } from "topk-js/data";
+import { select, field, fn } from "topk-js/query";
+
+// Query with u8 matrix
+const queryMatrix = matrix([
+  [12, 24, 36],
+  [48, 60, 72],
+  [84, 96, 108]
+], "u8");
+
+const results = await client.collection("documents").query(
+  select({
+    score: fn.multiVectorDistance("token_embeddings", queryMatrix)
+  })
+  .topk(field("score"), 10)
+);
+```
+
+```python Python
+from topk_sdk.data import matrix
+import numpy as np
+from topk_sdk.query import select, field, fn
+
+# Query with u8 matrix using numpy
+query_matrix = np.array([
+  [12, 24, 36],
+  [48, 60, 72],
+  [84, 96, 108]
+], dtype=np.uint8)
+
+results = client.collection("documents").query(
+  select(
+    score=fn.multi_vector_distance("token_embeddings", query_matrix)
+  )
+  .topk(field("score"), 10)
+)
+```
+
+</CodeGroup>
+
+## Combining with Filters
+
+Apply filters before multi-vector search:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, field, fn } from "topk-js/query";
+
+const results = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    score: fn.multiVectorDistance("token_embeddings", queryTokens)
+  })
+  .filter(field("category").eq("machine-learning"))
+  .topk(field("score"), 10)
+);
+```
+
+```python Python
+from topk_sdk.query import select, filter, field, fn
+
+results = client.collection("documents").query(
+  select(
+    "title",
+    score=fn.multi_vector_distance("token_embeddings", query_tokens)
+  )
+  .filter(field("category") == "machine-learning")
+  .topk(field("score"), 10)
+)
+```
+
+</CodeGroup>
+
+## Use Cases
+
+Multi-vector search is ideal for:
+
+- **Token-level embeddings**: Store embeddings for each token in a document
+- **ColBERT-style models**: Late interaction models that benefit from MaxSim
+- **Multi-representation documents**: Documents with multiple semantic aspects
+- **Fine-grained matching**: Match specific parts of documents rather than whole-document embeddings
+
+<Note>
+The matrix dimension parameter specifies the length of each individual vector (number of columns), not the number of vectors. The number of vectors (rows) can vary per document.
+</Note>
+
+<Warning>
+Ensure your query matrix has the same dimension (number of columns) as the indexed field, but the number of rows can differ.
+</Warning>
+
+## Related Concepts
+
+- [Vector Search](/concepts/vector-search) - Single vector per document
+- [True Hybrid Search](/concepts/true-hybrid-search) - Combine with other search types
+- [Reranking](/concepts/reranking) - Improve multi-vector search results

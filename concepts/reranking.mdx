@@ -1,0 +1,500 @@
+---
+title: Reranking
+description: Improve search results with neural reranking models
+---
+
+Reranking allows you to refine search results using sophisticated neural models that consider the full context of both query and documents. After an initial retrieval stage, reranking reorders the top candidates for better relevance.
+
+## Overview
+
+With reranking, you can:
+- Improve result quality after initial retrieval
+- Use state-of-the-art cross-encoder models
+- Consider multiple fields for ranking
+- Control the candidate pool size
+- Combine with any search technique (semantic, vector, keyword, hybrid)
+
+## Basic Reranking
+
+Add a rerank stage after your search query:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { Client } from "topk-js";
+import { text, semanticIndex } from "topk-js/schema";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+// Basic semantic search with reranking
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.semanticSimilarity("title", "classic American novel")
+  })
+  .topk(field("similarity"), 50)  // Retrieve 50 candidates
+  .rerank()  // Rerank with default model
+  .limit(10)  // Return top 10
+);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.schema import text, semantic_index
+from topk_sdk.query import select, field, fn
+
+client = Client(
+  api_key="YOUR_API_KEY",
+  region="aws-us-east-1-elastica"
+)
+
+# Basic semantic search with reranking
+results = client.collection("books").query(
+  select(
+    "title",
+    similarity=fn.semantic_similarity("title", "classic American novel")
+  )
+  .topk(field("similarity"), 50)  # Retrieve 50 candidates
+  .rerank()  # Rerank with default model
+  .limit(10)  # Return top 10
+)
+```
+
+</CodeGroup>
+
+<Info>
+When you call `rerank()` without parameters, TopK automatically uses the query from your semantic similarity function and reranks based on indexed fields.
+</Info>
+
+## Reranking Options
+
+Customize the reranking behavior:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.semanticSimilarity("title", "dystopian novel")
+  })
+  .topk(field("similarity"), 50)
+  .rerank({
+    model: "cohere/rerank-v4",  // Specify reranking model
+    query: "best dystopian novels with social commentary",  // Custom query
+    fields: ["title", "summary"],  // Fields to consider
+    topkMultiple: 3  // Consider 150 candidates (50 * 3)
+  })
+  .limit(10)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    similarity=fn.semantic_similarity("title", "dystopian novel")
+  )
+  .topk(field("similarity"), 50)
+  .rerank(
+    model="cohere/rerank-v4",  # Specify reranking model
+    query="best dystopian novels with social commentary",  # Custom query
+    fields=["title", "summary"],  # Fields to consider
+    topk_multiple=3  # Consider 150 candidates (50 * 3)
+  )
+  .limit(10)
+)
+```
+
+</CodeGroup>
+
+### Rerank Parameters
+
+- **model** (optional): The reranking model to use (default: `"cohere/rerank-v4"`)
+- **query** (optional): Custom query text for reranking. If not provided, TopK infers from semantic similarity queries
+- **fields** (optional): List of fields to include in reranking context
+- **topkMultiple** (optional): Multiplier for candidate pool size. If topk=50 and topkMultiple=2, reranking considers 100 documents
+
+<Note>
+The `topkMultiple` parameter allows you to expand the candidate pool for reranking without returning all candidates. This improves reranking quality while keeping the final result set small.
+</Note>
+
+## Reranking with Vector Search
+
+Rerank results from vector search:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+const queryEmbedding = await generateEmbedding("machine learning tutorial");
+
+const results = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    distance: fn.vectorDistance("embedding", queryEmbedding)
+  })
+  .topk(field("distance"), 100, true)  // Get 100 nearest neighbors
+  .rerank({
+    model: "cohere/rerank-v4",
+    query: "comprehensive machine learning tutorial for beginners",
+    fields: ["title", "content", "description"]
+  })
+  .limit(20)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+query_embedding = generate_embedding("machine learning tutorial")
+
+results = client.collection("documents").query(
+  select(
+    "title",
+    distance=fn.vector_distance("embedding", query_embedding)
+  )
+  .topk(field("distance"), 100, True)  # Get 100 nearest neighbors
+  .rerank(
+    model="cohere/rerank-v4",
+    query="comprehensive machine learning tutorial for beginners",
+    fields=["title", "content", "description"]
+  )
+  .limit(20)
+)
+```
+
+</CodeGroup>
+
+## Reranking with Keyword Search
+
+Rerank BM25 results:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, match, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    bm25_score: fn.bm25Score()
+  })
+  .filter(
+    match("dystopian", { field: "summary" }) |
+    match("totalitarian", { field: "summary" })
+  )
+  .topk(field("bm25_score"), 50)
+  .rerank({
+    model: "cohere/rerank-v4",
+    query: "dystopian novels about totalitarian governments",
+    fields: ["title", "summary"]
+  })
+  .limit(10)
+);
+```
+
+```python Python
+from topk_sdk.query import select, filter, match, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    bm25_score=fn.bm25_score()
+  )
+  .filter(
+    match("dystopian", "summary") |
+    match("totalitarian", "summary")
+  )
+  .topk(field("bm25_score"), 50)
+  .rerank(
+    model="cohere/rerank-v4",
+    query="dystopian novels about totalitarian governments",
+    fields=["title", "summary"]
+  )
+  .limit(10)
+)
+```
+
+</CodeGroup>
+
+## Reranking with Hybrid Search
+
+Rerank after combining multiple search signals:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, match, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    semantic_score: fn.semanticSimilarity("title", "artificial intelligence"),
+    keyword_score: fn.bm25Score()
+  })
+  .filter(match("ai machine learning", { field: "summary" }))
+  .topk(
+    // Hybrid scoring
+    field("semantic_score").mul(0.6).add(field("keyword_score").mul(0.4)),
+    100
+  )
+  .rerank({
+    model: "cohere/rerank-v4",
+    query: "introduction to artificial intelligence and machine learning",
+    fields: ["title", "summary", "content"],
+    topkMultiple: 2  // Consider 200 documents
+  })
+  .limit(15)
+);
+```
+
+```python Python
+from topk_sdk.query import select, filter, match, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    semantic_score=fn.semantic_similarity("title", "artificial intelligence"),
+    keyword_score=fn.bm25_score()
+  )
+  .filter(match("ai machine learning", "summary"))
+  .topk(
+    # Hybrid scoring
+    (field("semantic_score") * 0.6) + (field("keyword_score") * 0.4),
+    100
+  )
+  .rerank(
+    model="cohere/rerank-v4",
+    query="introduction to artificial intelligence and machine learning",
+    fields=["title", "summary", "content"],
+    topk_multiple=2  # Consider 200 documents
+  )
+  .limit(15)
+)
+```
+
+</CodeGroup>
+
+## Multiple Semantic Fields
+
+When using semantic similarity on multiple fields, you must explicitly specify the reranking query:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+// This requires explicit rerank query
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    title_sim: fn.semanticSimilarity("title", "classic literature"),
+    summary_sim: fn.semanticSimilarity("summary", "American authors")
+  })
+  .topk(field("title_sim").add(field("summary_sim")), 50)
+  .rerank({
+    model: "cohere/rerank-v4",
+    query: "classic American literature",  // Required when using multiple semantic fields
+    fields: ["title", "summary"]
+  })
+  .limit(10)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+# This requires explicit rerank query
+results = client.collection("books").query(
+  select(
+    "title",
+    title_sim=fn.semantic_similarity("title", "classic literature"),
+    summary_sim=fn.semantic_similarity("summary", "American authors")
+  )
+  .topk(field("title_sim") + field("summary_sim"), 50)
+  .rerank(
+    model="cohere/rerank-v4",
+    query="classic American literature",  # Required when using multiple semantic fields
+    fields=["title", "summary"]
+  )
+  .limit(10)
+)
+```
+
+</CodeGroup>
+
+<Warning>
+When your query uses multiple `semanticSimilarity()` functions with different queries, you must provide an explicit `query` parameter to `rerank()`, otherwise an error will be raised.
+</Warning>
+
+## Reranking Models
+
+TopK supports Cohere's reranking models:
+
+- `cohere/rerank-v4` (default) - Latest and most accurate
+- Custom models may be available depending on your plan
+
+<CodeGroup>
+
+```javascript JavaScript
+// Use default model
+.rerank()
+
+// Specify model explicitly
+.rerank({ model: "cohere/rerank-v4" })
+```
+
+```python Python
+# Use default model
+.rerank()
+
+# Specify model explicitly
+.rerank(model="cohere/rerank-v4")
+```
+
+</CodeGroup>
+
+## Best Practices
+
+### Candidate Pool Size
+
+Retrieve more candidates than your final result set:
+
+- **Minimum**: 5-10x your final result size
+- **Recommended**: 10-20x for best quality
+- **Maximum**: Balance quality with latency and cost
+
+<CodeGroup>
+
+```javascript JavaScript
+// Good: Retrieve 100 candidates, return 10 results
+.topk(field("score"), 100)
+.rerank()
+.limit(10)
+
+// Better: Expand to 200 candidates with topkMultiple
+.topk(field("score"), 100)
+.rerank({ topkMultiple: 2 })
+.limit(10)
+```
+
+```python Python
+# Good: Retrieve 100 candidates, return 10 results
+.topk(field("score"), 100)
+.rerank()
+.limit(10)
+
+# Better: Expand to 200 candidates with topkMultiple
+.topk(field("score"), 100)
+.rerank(topk_multiple=2)
+.limit(10)
+```
+
+</CodeGroup>
+
+### Field Selection
+
+Include relevant fields for context:
+
+- Include the main content fields (title, description, body)
+- Exclude very long fields that might dilute relevance
+- Consider the query context when selecting fields
+
+<CodeGroup>
+
+```javascript JavaScript
+// Good: Select relevant fields
+.rerank({
+  query: "machine learning tutorial",
+  fields: ["title", "summary", "introduction"]
+})
+
+// Avoid: Too many or irrelevant fields
+.rerank({
+  query: "machine learning tutorial",
+  fields: ["title", "summary", "full_text", "metadata", "id"]
+})
+```
+
+```python Python
+# Good: Select relevant fields
+.rerank(
+  query="machine learning tutorial",
+  fields=["title", "summary", "introduction"]
+)
+
+# Avoid: Too many or irrelevant fields
+.rerank(
+  query="machine learning tutorial",
+  fields=["title", "summary", "full_text", "metadata", "id"]
+)
+```
+
+</CodeGroup>
+
+### Query Formulation
+
+Write descriptive queries for reranking:
+
+- Use natural, descriptive language
+- Include context and intent
+- Expand abbreviations and acronyms
+
+<CodeGroup>
+
+```javascript JavaScript
+// Good: Descriptive query
+.rerank({
+  query: "comprehensive beginner-friendly machine learning tutorial with code examples"
+})
+
+// Less effective: Terse query
+.rerank({
+  query: "ml tutorial"
+})
+```
+
+```python Python
+# Good: Descriptive query
+.rerank(
+  query="comprehensive beginner-friendly machine learning tutorial with code examples"
+)
+
+# Less effective: Terse query
+.rerank(
+  query="ml tutorial"
+)
+```
+
+</CodeGroup>
+
+<Tip>
+Reranking is most effective when the initial retrieval stage has high recall (finds most relevant documents) but may have imperfect precision. The reranker can then refine the ordering.
+</Tip>
+
+## Performance Considerations
+
+- **Latency**: Reranking adds latency proportional to the number of candidates
+- **Cost**: Reranking may incur additional costs based on your plan
+- **Quality**: More candidates generally means better results, but with diminishing returns
+
+<Info>
+Start with a moderate candidate pool (50-100 documents) and measure the impact on both latency and result quality before scaling up.
+</Info>
+
+## Related Concepts
+
+- [Semantic Search](/concepts/semantic-search) - Natural language search
+- [True Hybrid Search](/concepts/true-hybrid-search) - Combine search techniques
+- [Vector Search](/concepts/vector-search) - Custom embedding search
+- [Keyword Search](/concepts/keyword-search) - Term-based search

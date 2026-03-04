@@ -1,0 +1,593 @@
+---
+title: "Data Types"
+description: "Data type constructors and utilities for TopK documents"
+---
+
+## Overview
+
+The data module provides functions to create special data types for use in TopK documents. These types include vectors, sparse vectors, matrices, and byte arrays. Import data functions from `topk-js/data`.
+
+```javascript
+import { 
+  bytes,
+  f32Vector,
+  f16Vector,
+  f8Vector,
+  binaryVector,
+  u8Vector,
+  i8Vector,
+  f32SparseVector,
+  u8SparseVector,
+  matrix,
+  f32List,
+  f64List,
+  i32List,
+  i64List,
+  u32List,
+  stringList
+} from "topk-js/data";
+```
+
+## Classes
+
+### List
+
+Instances of the `List` class are used to represent lists of values in TopK. Usually created using data constructors such as `f32List()`, `i32List()`, etc.
+
+### SparseVector
+
+Instances of the `SparseVector` class are used to represent sparse vectors in TopK. Usually created using data constructors such as `f32SparseVector()` or `u8SparseVector()`.
+
+### Matrix
+
+Instances of the `Matrix` class are used to represent matrices in TopK. Usually created using the `matrix()` constructor.
+
+## Dense Vector Functions
+
+### f32Vector(values)
+
+Creates a List type containing a 32-bit float vector. This function is an alias for `f32List()`.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 32-bit float values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f32Vector } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    embedding: f32Vector([0.12, 0.67, 0.82, 0.53])
+  }
+]);
+```
+</CodeGroup>
+
+### f16Vector(values)
+
+Creates a List type containing a 16-bit float vector.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 16-bit float values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f16Vector } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    embedding: f16Vector([0.12, 0.67, 0.82, 0.53])
+  }
+]);
+```
+</CodeGroup>
+
+### f8Vector(values)
+
+Creates a List type containing an 8-bit float vector.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 8-bit float values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f8Vector } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    embedding: f8Vector([0.12, 0.67, 0.82, 0.53])
+  }
+]);
+```
+</CodeGroup>
+
+### binaryVector(values)
+
+Creates a List type containing a binary vector. This function is an alias for `binaryList()`.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of binary values (0 or 1)
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { binaryVector } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    embedding: binaryVector([0, 1, 1, 0, 1, 0, 0, 1])
+  }
+]);
+```
+</CodeGroup>
+
+### u8Vector(values)
+
+Creates a List type containing an 8-bit unsigned integer vector. This function is an alias for `u8List()`.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 8-bit unsigned integer values (0-255)
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { u8Vector } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    embedding: u8Vector([0, 255, 1, 2, 3])
+  }
+]);
+```
+</CodeGroup>
+
+### i8Vector(values)
+
+Creates a List type containing an 8-bit signed integer vector. This function is an alias for `i8List()`.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 8-bit signed integer values (-128 to 127)
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { i8Vector } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    embedding: i8Vector([-128, 127, -1, 0, 1])
+  }
+]);
+```
+</CodeGroup>
+
+## Sparse Vector Functions
+
+### f32SparseVector(vector)
+
+Creates a SparseVector type containing a sparse vector of 32-bit floats. This function is an alias for `f32SparseList()`.
+
+<ParamField path="vector" type="Record<number, number>" required>
+  Object mapping dimension indices to values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f32SparseVector } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    sparse_embedding: f32SparseVector({
+      0: 0.12,
+      6: 0.67,
+      17: 0.82,
+      97: 0.53
+    })
+  }
+]);
+```
+</CodeGroup>
+
+### u8SparseVector(vector)
+
+Creates a SparseVector type containing a sparse vector of 8-bit unsigned integers. This function is an alias for `u8SparseList()`.
+
+<ParamField path="vector" type="Record<number, number>" required>
+  Object mapping dimension indices to values (0-255)
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { u8SparseVector } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    sparse_embedding: u8SparseVector({
+      0: 12,
+      6: 67,
+      17: 82,
+      97: 53
+    })
+  }
+]);
+```
+</CodeGroup>
+
+## Matrix Functions
+
+### matrix(values, valueType?)
+
+Creates a Matrix type containing matrix values.
+
+<ParamField path="values" type="Array<Array<number>>" required>
+  Array of number arrays representing the matrix rows
+</ParamField>
+
+<ParamField path="valueType" type="MatrixValueType">
+  The matrix element value type. Defaults to `'f32'`. Can be:
+  - `'f32'` - 32-bit float
+  - `'f16'` - 16-bit float
+  - `'f8'` - 8-bit float
+  - `'u8'` - 8-bit unsigned integer
+  - `'i8'` - 8-bit signed integer
+</ParamField>
+
+<CodeGroup>
+```javascript Default (f32)
+import { matrix } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    token_embeddings: matrix([
+      [1.0, 2.0, 3.0],
+      [4.0, 5.0, 6.0]
+    ])
+  }
+]);
+```
+
+```javascript With Type
+import { matrix } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    token_embeddings: matrix(
+      [
+        [1.0, 2.0, 3.0],
+        [4.0, 5.0, 6.0]
+      ],
+      "f16"
+    )
+  }
+]);
+```
+</CodeGroup>
+
+## List Functions
+
+### f32List(values)
+
+Creates a List type containing a list of 32-bit floating point numbers.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 32-bit float values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f32List } from "topk-js/data";
+
+await client.collection("analytics").upsert([
+  {
+    _id: "1",
+    measurements: f32List([0.12, 0.67, 0.82, 0.53])
+  }
+]);
+```
+</CodeGroup>
+
+### f64List(values)
+
+Creates a List type containing a list of 64-bit floating point numbers.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 64-bit float values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f64List } from "topk-js/data";
+
+await client.collection("analytics").upsert([
+  {
+    _id: "1",
+    precise_measurements: f64List([0.12, 0.67, 0.82, 0.53])
+  }
+]);
+```
+</CodeGroup>
+
+### i32List(values)
+
+Creates a List type containing a list of 32-bit signed integers.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 32-bit integer values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { i32List } from "topk-js/data";
+
+await client.collection("analytics").upsert([
+  {
+    _id: "1",
+    counts: i32List([0, 1, 2, 3, -1, -2])
+  }
+]);
+```
+</CodeGroup>
+
+### i64List(values)
+
+Creates a List type containing a list of 64-bit signed integers.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 64-bit integer values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { i64List } from "topk-js/data";
+
+await client.collection("analytics").upsert([
+  {
+    _id: "1",
+    large_counts: i64List([0, 1, 2, 3])
+  }
+]);
+```
+</CodeGroup>
+
+### u32List(values)
+
+Creates a List type containing a list of 32-bit unsigned integers.
+
+<ParamField path="values" type="Array<number>" required>
+  Array of 32-bit unsigned integer values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { u32List } from "topk-js/data";
+
+await client.collection("analytics").upsert([
+  {
+    _id: "1",
+    positive_counts: u32List([0, 1, 2, 3])
+  }
+]);
+```
+</CodeGroup>
+
+### stringList(values)
+
+Creates a List type containing a list of strings.
+
+<ParamField path="values" type="Array<string>" required>
+  Array of string values
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { stringList } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "1",
+    title: "Example Book",
+    tags: stringList(["fiction", "adventure", "classic"])
+  }
+]);
+```
+</CodeGroup>
+
+## Bytes Function
+
+### bytes(buffer)
+
+Creates bytes data from an array of numbers or a Buffer.
+
+<ParamField path="buffer" type="Array<number> | Buffer" required>
+  Array of byte values or a Buffer object
+</ParamField>
+
+<CodeGroup>
+```javascript Array Example
+import { bytes } from "topk-js/data";
+
+await client.collection("files").upsert([
+  {
+    _id: "1",
+    data: bytes([0, 1, 1, 0])
+  }
+]);
+```
+
+```javascript Buffer Example
+import { bytes } from "topk-js/data";
+import fs from "fs";
+
+const fileBuffer = fs.readFileSync("image.png");
+
+await client.collection("files").upsert([
+  {
+    _id: "1",
+    image_data: bytes(fileBuffer)
+  }
+]);
+```
+</CodeGroup>
+
+## Complete Examples
+
+<CodeGroup>
+```javascript Dense Vector Search
+import { Client } from "topk-js";
+import { f32Vector, vectorIndex } from "topk-js/schema";
+import { f32Vector as dataF32Vector } from "topk-js/data";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+// Create collection with vector field
+await client.collections().create("products", {
+  title: text(),
+  embedding: f32Vector({ dimension: 384 }).index(
+    vectorIndex({ metric: "cosine" })
+  )
+});
+
+// Insert documents with vectors
+await client.collection("products").upsert([
+  {
+    _id: "1",
+    title: "Product 1",
+    embedding: dataF32Vector([0.1, 0.2, 0.3, /* ... 384 dimensions */])
+  }
+]);
+
+// Query with vector distance
+const results = await client.collection("products").query(
+  select({
+    title: field("title"),
+    distance: fn.vectorDistance(
+      "embedding",
+      [0.2, 0.3, 0.4, /* ... */]
+    )
+  })
+  .topk(field("distance"), 10)
+);
+```
+
+```javascript Sparse Vector Search
+import { Client } from "topk-js";
+import { f32SparseVector, vectorIndex } from "topk-js/schema";
+import { f32SparseVector as dataSparseVector } from "topk-js/data";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+// Create collection with sparse vector field
+await client.collections().create("documents", {
+  title: text(),
+  sparse_embedding: f32SparseVector().index(
+    vectorIndex({ metric: "dot_product" })
+  )
+});
+
+// Insert documents with sparse vectors
+await client.collection("documents").upsert([
+  {
+    _id: "1",
+    title: "Document 1",
+    sparse_embedding: dataSparseVector({
+      0: 0.5,
+      10: 0.8,
+      25: 0.3,
+      100: 0.9
+    })
+  }
+]);
+
+// Query with sparse vector
+const results = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    distance: fn.vectorDistance(
+      "sparse_embedding",
+      dataSparseVector({0: 0.6, 10: 0.7, 25: 0.4})
+    )
+  })
+  .topk(field("distance"), 10)
+);
+```
+
+```javascript Multi-Vector Search
+import { Client } from "topk-js";
+import { matrix, multiVectorIndex } from "topk-js/schema";
+import { matrix as dataMatrix } from "topk-js/data";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+// Create collection with matrix field
+await client.collections().create("documents", {
+  title: text(),
+  token_embeddings: matrix({ dimension: 384, valueType: "f32" }).index(
+    multiVectorIndex({ metric: "maxsim" })
+  )
+});
+
+// Insert documents with matrices
+await client.collection("documents").upsert([
+  {
+    _id: "1",
+    title: "Document 1",
+    token_embeddings: dataMatrix([
+      [0.1, 0.2, 0.3, /* ... */],
+      [0.4, 0.5, 0.6, /* ... */],
+      [0.7, 0.8, 0.9, /* ... */]
+    ])
+  }
+]);
+
+// Query with multi-vector distance
+const results = await client.collection("documents").query(
+  select({
+    title: field("title"),
+    distance: fn.multiVectorDistance(
+      "token_embeddings",
+      [
+        [0.2, 0.3, 0.4, /* ... */],
+        [0.5, 0.6, 0.7, /* ... */]
+      ],
+      100
+    )
+  })
+  .topk(field("distance"), 10)
+);
+```
+</CodeGroup>

@@ -1,0 +1,327 @@
+---
+title: "Client"
+description: "The main TopK client for interacting with the TopK service"
+---
+
+## Client
+
+The main TopK client for interacting with the TopK service. This client provides access to collections and allows you to perform various operations like creating collections, querying data, and managing documents.
+
+### Constructor
+
+<ParamField path="config" type="ClientConfig" required>
+  Configuration object for the TopK client
+</ParamField>
+
+<CodeGroup>
+```javascript Basic
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+```
+
+```javascript With Options
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica",
+  https: true,
+  retryConfig: {
+    maxRetries: 3,
+    timeout: 30000,
+    backoff: {
+      base: 2.0,
+      initBackoff: 100,
+      maxBackoff: 5000
+    }
+  }
+});
+```
+</CodeGroup>
+
+## ClientConfig
+
+Configuration for the TopK client. This struct contains all the necessary configuration options to connect to the TopK API.
+
+<ParamField path="apiKey" type="string" required>
+  Your TopK API key for authentication
+</ParamField>
+
+<ParamField path="region" type="string" required>
+  The region where your data is stored. For available regions see: [https://docs.topk.io/regions](https://docs.topk.io/regions)
+</ParamField>
+
+<ParamField path="host" type="string">
+  Custom host URL (optional, defaults to the standard TopK endpoint)
+</ParamField>
+
+<ParamField path="https" type="boolean">
+  Whether to use HTTPS (optional, defaults to true)
+</ParamField>
+
+<ParamField path="retryConfig" type="RetryConfig">
+  Retry configuration for failed requests (optional)
+</ParamField>
+
+## Methods
+
+### collections()
+
+Returns a client for managing collections. This method provides access to collection management operations like creating, listing, and deleting collections.
+
+<CodeGroup>
+```javascript Example
+const collectionsClient = client.collections();
+
+// List all collections
+const collections = await collectionsClient.list();
+
+// Create a new collection
+await collectionsClient.create("books", schema);
+```
+</CodeGroup>
+
+<ResponseField name="return" type="CollectionsClient">
+  A client for managing collections
+</ResponseField>
+
+### collection(name)
+
+Returns a client for interacting with a specific collection.
+
+<ParamField path="name" type="string" required>
+  The name of the collection
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+const booksCollection = client.collection("books");
+
+// Query the collection
+const results = await booksCollection.query(query);
+
+// Upsert documents
+await booksCollection.upsert([{ _id: "1", title: "Book Title" }]);
+```
+</CodeGroup>
+
+<ResponseField name="return" type="CollectionClient">
+  A client for interacting with the specified collection
+</ResponseField>
+
+## CollectionClient
+
+Client for interacting with a specific collection. This client provides methods to perform operations on a specific collection, including querying, upserting, and deleting documents.
+
+### get(ids, fields?, options?)
+
+Retrieves documents by their IDs.
+
+<ParamField path="ids" type="Array<string>" required>
+  Array of document IDs to retrieve
+</ParamField>
+
+<ParamField path="fields" type="Array<string>">
+  Optional array of field names to retrieve. If not specified, all fields are returned
+</ParamField>
+
+<ParamField path="options" type="QueryOptions">
+  Optional query options for consistency control
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+// Get documents by IDs
+const docs = await client.collection("books").get(["id_1", "id_2"]);
+
+// Get specific fields only
+const titleOnly = await client.collection("books").get(
+  ["id_1", "id_2"],
+  ["title", "author"]
+);
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<Record<string, Record<string, any>>>">
+  A promise that resolves to a map of document IDs to documents
+</ResponseField>
+
+### count(options?)
+
+Counts the number of documents in the collection.
+
+<ParamField path="options" type="QueryOptions">
+  Optional query options for consistency control
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+const totalDocs = await client.collection("books").count();
+console.log(`Total documents: ${totalDocs}`);
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<number>">
+  A promise that resolves to the number of documents in the collection
+</ResponseField>
+
+### query(query, options?)
+
+Executes a query against the collection.
+
+<ParamField path="query" type="query.Query" required>
+  The query to execute
+</ParamField>
+
+<ParamField path="options" type="QueryOptions">
+  Optional query options for consistency control
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.semanticSimilarity("title", "classic novel")
+  })
+  .topk(field("similarity"), 10)
+);
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<Array<Record<string, any>>>">
+  A promise that resolves to an array of matching documents
+</ResponseField>
+
+### upsert(docs)
+
+Inserts or updates documents in the collection.
+
+<ParamField path="docs" type="Array<Record<string, any>>" required>
+  Array of documents to upsert. Each document must have an `_id` field
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+await client.collection("books").upsert([
+  { _id: "gatsby", title: "The Great Gatsby", author: "F. Scott Fitzgerald" },
+  { _id: "1984", title: "1984", author: "George Orwell" }
+]);
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<string>">
+  A promise that resolves to the LSN (Log Sequence Number) at which the upsert was applied
+</ResponseField>
+
+### update(docs, failOnMissing?)
+
+Updates documents in the collection. Existing documents will be merged with the provided fields. Missing documents will be ignored.
+
+<ParamField path="docs" type="Array<Record<string, any>>" required>
+  Array of documents with fields to update. Each document must have an `_id` field
+</ParamField>
+
+<ParamField path="failOnMissing" type="boolean">
+  If true, the operation will fail if any document is missing. Defaults to false
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+await client.collection("books").update([
+  { _id: "gatsby", year: 1925 },
+  { _id: "1984", year: 1949 }
+]);
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<string>">
+  The LSN at which the update was applied. If no updates were applied, this will be empty
+</ResponseField>
+
+### delete(expr)
+
+Deletes documents from the collection by their IDs or using a filter expression.
+
+<ParamField path="expr" type="Array<string> | query.LogicalExpression" required>
+  Either an array of document IDs or a logical filter expression
+</ParamField>
+
+<CodeGroup>
+```javascript Delete by IDs
+await client.collection("books").delete(["id_1", "id_2"]);
+```
+
+```javascript Delete by Filter
+import { field } from "topk-js/query";
+
+await client.collection("books").delete(
+  field("published_year").gt(1997)
+);
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<string>">
+  A promise that resolves to the LSN at which the delete was applied
+</ResponseField>
+
+## Supporting Types
+
+### RetryConfig
+
+Configuration for retry behavior when requests fail.
+
+<ParamField path="maxRetries" type="number">
+  Maximum number of retries to attempt before giving up
+</ParamField>
+
+<ParamField path="timeout" type="number">
+  Total timeout for the entire retry chain in milliseconds
+</ParamField>
+
+<ParamField path="backoff" type="BackoffConfig">
+  Backoff configuration for spacing out retry attempts
+</ParamField>
+
+### BackoffConfig
+
+Configuration for exponential backoff between retry attempts.
+
+<ParamField path="base" type="number">
+  Base multiplier for exponential backoff (default: 2.0)
+</ParamField>
+
+<ParamField path="initBackoff" type="number">
+  Initial delay before the first retry in milliseconds
+</ParamField>
+
+<ParamField path="maxBackoff" type="number">
+  Maximum delay between retries in milliseconds
+</ParamField>
+
+### QueryOptions
+
+Options for query operations. These options control the behavior of query operations, including consistency guarantees and sequence number constraints.
+
+<ParamField path="lsn" type="string">
+  Last sequence number to query at (for consistency)
+</ParamField>
+
+<ParamField path="consistency" type="ConsistencyLevel">
+  Consistency level for the query. Can be:
+  - `'indexed'`: Query returns results as soon as they are indexed (faster, eventual consistency)
+  - `'strong'`: Query waits for all replicas to be consistent (slower, strong consistency)
+</ParamField>
+
+### ConsistencyLevel
+
+Consistency levels for query operations.
+
+- `'indexed'` - Indexed consistency: faster, eventual consistency
+- `'strong'` - Strong consistency: slower, waits for all replicas

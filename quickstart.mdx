@@ -1,80 +1,388 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Build your first TopK search application in under 5 minutes
 ---
 
-## Get started in three steps
+This quickstart guide walks you through creating a semantic search application with TopK. You'll learn how to create a collection, add documents, and perform searches.
 
-Get your documentation site running locally and make your first customization.
+<Info>
+  Before starting, make sure you have:
+  - Installed the TopK SDK ([Installation guide](/installation))
+  - Obtained an API key from [console.topk.io](https://console.topk.io)
+</Info>
 
-### Step 1: Set up your local environment
+## What you'll build
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+By the end of this guide, you'll have a working search application that can:
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Create a collection">
+    Set up a collection with semantic search enabled
+  </Step>
+  
+  <Step title="Insert documents">
+    Add sample book data to your collection
+  </Step>
+  
+  <Step title="Search semantically">
+    Query your collection using natural language
+  </Step>
+  
+  <Step title="Get ranked results">
+    Retrieve and optionally rerank the most relevant results
+  </Step>
+</Steps>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Step 1: Initialize the client
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+First, create a TopK client with your API key and chosen [region](/regions).
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<CodeGroup>
 
-### Step 3: Go live
+```python Python
+from topk_sdk import Client
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+client = Client(
+    api_key="YOUR_TOPK_API_KEY",
+    region="aws-us-east-1-elastica"
+)
+```
+
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+```
+
+</CodeGroup>
+
+<Note>
+  Replace `YOUR_TOPK_API_KEY` with your actual API key from the console.
+</Note>
+
+## Step 2: Create a collection
+
+Create a collection called `books` with a semantic index on the `title` field. This enables both semantic and keyword search.
+
+<CodeGroup>
+
+```python Python
+from topk_sdk.schema import text, semantic_index
+
+client.collections().create(
+    "books",
+    schema={
+        "title": text().required().index(semantic_index()),
+    },
+)
+```
+
+```javascript JavaScript
+import { text, semanticIndex } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title: text().required().index(semanticIndex()),
+});
+```
+
+</CodeGroup>
+
+### What's happening here?
+
+- `text()` - Defines a text field
+- `.required()` - Makes the field mandatory for all documents
+- `.index(semantic_index())` - Creates a semantic index with automatic embeddings
+
+<Tip>
+  Fields not defined in the schema can still be added to documents. The schema only enforces types and indexes for specified fields.
+</Tip>
+
+## Step 3: Add documents
+
+Insert some sample book documents into your collection. Each document must have an `_id` field.
+
+<CodeGroup>
+
+```python Python
+client.collection("books").upsert([
+    {"_id": "gatsby", "title": "The Great Gatsby"},
+    {"_id": "1984", "title": "1984"},
+    {"_id": "catcher", "title": "The Catcher in the Rye"},
+])
+```
+
+```javascript JavaScript
+await client.collection("books").upsert([
+  { _id: "gatsby", title: "The Great Gatsby" },
+  { _id: "1984", title: "1984" },
+  { _id: "catcher", title: "The Catcher in the Rye" },
+]);
+```
+
+</CodeGroup>
+
+<Info>
+  The `upsert()` method creates new documents or updates existing ones if a document with the same `_id` already exists.
+</Info>
+
+## Step 4: Search your collection
+
+Now perform a semantic search to find books related to "classic American novel".
+
+<CodeGroup>
+
+```python Python
+from topk_sdk.query import select, fn, field
+
+results = client.collection("books").query(
+    select(
+        "title",
+        # Calculate semantic similarity between title and query
+        title_similarity=fn.semantic_similarity(
+            "title", 
+            "classic American novel"
+        ),
+    )
+    # Sort by similarity and return top 10 results
+    .topk(field("title_similarity"), 10)
+)
+
+for doc in results:
+    print(f"{doc['title']}: {doc['title_similarity']:.4f}")
+```
+
+```javascript JavaScript
+import { select, fn, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    // Calculate semantic similarity between title and query
+    title_similarity: fn.semanticSimilarity(
+      "title",
+      "classic American novel"
+    ),
+  })
+    // Sort by similarity and return top 10 results
+    .topk(field("title_similarity"), 10)
+);
+
+for (const doc of results) {
+  console.log(`${doc.title}: ${doc.title_similarity.toFixed(4)}`);
+}
+```
+
+</CodeGroup>
+
+### Understanding the query
+
+Let's break down the query:
+
+1. `select()` - Defines which fields to return and computed expressions
+2. `fn.semantic_similarity()` - Computes semantic similarity score between the field and query text
+3. `.topk()` - Sorts by the similarity score and limits results to top 10
+
+### Expected output
+
+```
+The Great Gatsby: 0.8532
+The Catcher in the Rye: 0.7891
+1984: 0.6234
+```
+
+<Note>
+  Scores are similarity values - higher means more relevant. The exact values may vary based on the embedding model.
+</Note>
+
+## Step 5: Add reranking (optional)
+
+Improve result relevance by adding reranking to your query:
+
+<CodeGroup>
+
+```python Python
+from topk_sdk.query import select, fn, field
+
+results = client.collection("books").query(
+    select(
+        "title",
+        title_similarity=fn.semantic_similarity(
+            "title", 
+            "classic American novel"
+        ),
+    )
+    .topk(field("title_similarity"), 10)
+    # Add reranking to improve relevance
+    .rerank()
+)
+```
+
+```javascript JavaScript
+import { select, fn, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    title_similarity: fn.semanticSimilarity(
+      "title",
+      "classic American novel"
+    ),
+  })
+    .topk(field("title_similarity"), 10)
+    // Add reranking to improve relevance
+    .rerank()
+);
+```
+
+</CodeGroup>
+
+The `.rerank()` method uses TopK's built-in reranking model to refine the results, improving precision for the top results.
+
+<Info>
+  Learn more about reranking options in the [Reranking guide](/concepts/reranking).
+</Info>
+
+## Step 6: Clean up (optional)
+
+When you're done experimenting, you can delete the collection:
+
+<CodeGroup>
+
+```python Python
+client.collections().delete("books")
+```
+
+```javascript JavaScript
+await client.collections().delete("books");
+```
+
+</CodeGroup>
+
+<Warning>
+  Deleting a collection is **irreversible**. All documents and data in the collection will be permanently deleted.
+</Warning>
+
+## Complete example
+
+Here's the full code in one place:
+
+<CodeGroup>
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.schema import text, semantic_index
+from topk_sdk.query import select, fn, field
+
+# 1. Initialize client
+client = Client(
+    api_key="YOUR_TOPK_API_KEY",
+    region="aws-us-east-1-elastica"
+)
+
+# 2. Create collection
+client.collections().create(
+    "books",
+    schema={
+        "title": text().required().index(semantic_index()),
+    },
+)
+
+# 3. Add documents
+client.collection("books").upsert([
+    {"_id": "gatsby", "title": "The Great Gatsby"},
+    {"_id": "1984", "title": "1984"},
+    {"_id": "catcher", "title": "The Catcher in the Rye"},
+])
+
+# 4. Search with semantic similarity
+results = client.collection("books").query(
+    select(
+        "title",
+        title_similarity=fn.semantic_similarity(
+            "title", 
+            "classic American novel"
+        ),
+    )
+    .topk(field("title_similarity"), 10)
+    .rerank()
+)
+
+# 5. Display results
+for doc in results:
+    print(f"{doc['title']}: {doc['title_similarity']:.4f}")
+
+# 6. Clean up (optional)
+client.collections().delete("books")
+```
+
+```javascript JavaScript
+import { Client } from "topk-js";
+import { text, semanticIndex } from "topk-js/schema";
+import { select, fn, field } from "topk-js/query";
+
+// 1. Initialize client
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+// 2. Create collection
+await client.collections().create("books", {
+  title: text().required().index(semanticIndex()),
+});
+
+// 3. Add documents
+await client.collection("books").upsert([
+  { _id: "gatsby", title: "The Great Gatsby" },
+  { _id: "1984", title: "1984" },
+  { _id: "catcher", title: "The Catcher in the Rye" },
+]);
+
+// 4. Search with semantic similarity
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    title_similarity: fn.semanticSimilarity(
+      "title",
+      "classic American novel"
+    ),
+  })
+    .topk(field("title_similarity"), 10)
+    .rerank()
+);
+
+// 5. Display results
+for (const doc of results) {
+  console.log(`${doc.title}: ${doc.title_similarity.toFixed(4)}`);
+}
+
+// 6. Clean up (optional)
+await client.collections().delete("books");
+```
+
+</CodeGroup>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you've built your first search application, explore more advanced features:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Schema design" icon="table" href="/collections/create">
+    Learn about field types, indexes, and schema validation
+  </Card>
+  
+  <Card title="Advanced queries" icon="magnifying-glass" href="/documents/query">
+    Combine filters, keyword search, and semantic search
+  </Card>
+  
+  <Card title="Vector search" icon="vector-square" href="/concepts/vector-search">
+    Use custom embeddings for vector similarity search
+  </Card>
+  
+  <Card title="Keyword search" icon="text" href="/concepts/keyword-search">
+    Perform traditional text matching with BM25 scoring
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

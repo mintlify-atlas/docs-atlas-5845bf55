@@ -1,0 +1,576 @@
+---
+title: "Update Documents"
+description: "Merge updates into existing documents in a TopK collection"
+---
+
+## Overview
+
+The `update()` method merges new field values into existing documents in a collection. Unlike `upsert()`, which replaces entire documents, `update()` only modifies the specified fields while preserving other fields in the document.
+
+<Note>
+  Documents are identified by their `_id` field. Only existing documents will be updated. By default, missing documents are silently ignored.
+</Note>
+
+## Method Signature
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    update(
+      docs: Array<Record<string, any>>,
+      failOnMissing?: boolean | null
+    ): Promise<string>
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    def update(
+        documents: Sequence[Mapping[str, Any]],
+        fail_on_missing: Optional[bool] = None
+    ) -> str:
+        """Update documents in the collection.
+        
+        Existing documents will be merged with the provided fields.
+        Missing documents will be ignored.
+        
+        Returns the LSN at which the update was applied.
+        If no updates were applied, this will be empty.
+        """
+    ```
+  </Tab>
+</Tabs>
+
+## Parameters
+
+<ParamField path="docs" type="Array<Record<string, any>>" required>
+  An array of partial document objects to merge. Each document must include an `_id` field to identify which document to update.
+</ParamField>
+
+<ParamField path="failOnMissing" type="boolean" default="false">
+  If `true`, the operation will fail if any of the specified document IDs don't exist. If `false` (default), missing documents are silently ignored.
+</ParamField>
+
+## Returns
+
+<ResponseField name="lsn" type="string">
+  The Log Sequence Number (LSN) at which the update was applied. If no updates were applied (e.g., all documents were missing), this will be an empty string.
+</ResponseField>
+
+## Examples
+
+### Basic Update
+
+Update specific fields in existing documents.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Update only the price field
+const lsn = await client.collection("books").update([{
+  _id: "book_1",
+  price: 29.99
+}]);
+
+console.log(`Updated at LSN: ${lsn}`);
+// Other fields like title, author, etc. remain unchanged
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Update only the price field
+lsn = client.collection("books").update([{
+    "_id": "book_1",
+    "price": 29.99
+}])
+
+print(f"Updated at LSN: {lsn}")
+# Other fields like title, author, etc. remain unchanged
+```
+</CodeGroup>
+
+### Update Multiple Documents
+
+Update several documents in a single operation.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Update prices for multiple books
+const lsn = await client.collection("books").update([
+  {
+    _id: "book_1",
+    price: 19.99,
+    on_sale: true
+  },
+  {
+    _id: "book_2",
+    price: 24.99,
+    on_sale: true
+  },
+  {
+    _id: "book_3",
+    price: 14.99,
+    on_sale: true
+  }
+]);
+
+console.log(`Batch updated at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Update prices for multiple books
+lsn = client.collection("books").update([
+    {
+        "_id": "book_1",
+        "price": 19.99,
+        "on_sale": True
+    },
+    {
+        "_id": "book_2",
+        "price": 24.99,
+        "on_sale": True
+    },
+    {
+        "_id": "book_3",
+        "price": 14.99,
+        "on_sale": True
+    }
+])
+
+print(f"Batch updated at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Update with Fail on Missing
+
+Fail the operation if any documents don't exist.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+try {
+  const lsn = await client.collection("books").update(
+    [{
+      _id: "book_999", // This ID doesn't exist
+      price: 29.99
+    }],
+    true // Fail if the document doesn't exist
+  );
+  console.log(`Updated at LSN: ${lsn}`);
+} catch (error) {
+  console.error("Update failed: Document not found", error);
+}
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+try:
+    lsn = client.collection("books").update(
+        [{
+            "_id": "book_999",  # This ID doesn't exist
+            "price": 29.99
+        }],
+        fail_on_missing=True  # Fail if the document doesn't exist
+    )
+    print(f"Updated at LSN: {lsn}")
+except Exception as error:
+    print(f"Update failed: Document not found - {error}")
+```
+</CodeGroup>
+
+### Update Nested Fields
+
+Update complex nested structures.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const lsn = await client.collection("products").update([{
+  _id: "product_1",
+  metadata: {
+    last_updated: new Date().toISOString(),
+    updated_by: "admin"
+  },
+  inventory: {
+    quantity: 150,
+    warehouse: "US-East"
+  }
+}]);
+
+console.log(`Updated product metadata at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from datetime import datetime
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+lsn = client.collection("products").update([{
+    "_id": "product_1",
+    "metadata": {
+        "last_updated": datetime.now().isoformat(),
+        "updated_by": "admin"
+    },
+    "inventory": {
+        "quantity": 150,
+        "warehouse": "US-East"
+    }
+}])
+
+print(f"Updated product metadata at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Update Vector Embeddings
+
+Update embedding vectors while preserving other fields.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { f32Vector } from "topk-js/data";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Update only the embedding, keeping title and other fields
+const lsn = await client.collection("books").update([{
+  _id: "book_1",
+  embedding: f32Vector([0.91, 0.82, 0.73, 0.64])
+}]);
+
+console.log(`Updated embedding at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.data import f32_vector
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Update only the embedding, keeping title and other fields
+lsn = client.collection("books").update([{
+    "_id": "book_1",
+    "embedding": f32_vector([0.91, 0.82, 0.73, 0.64])
+}])
+
+print(f"Updated embedding at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Partial Updates with Arrays
+
+Update array fields by replacing them entirely.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Add new genres by replacing the entire array
+const lsn = await client.collection("books").update([{
+  _id: "book_1",
+  genres: ["Fiction", "Classic", "American Literature"]
+}]);
+
+console.log(`Updated genres at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Add new genres by replacing the entire array
+lsn = client.collection("books").update([{
+    "_id": "book_1",
+    "genres": ["Fiction", "Classic", "American Literature"]
+}])
+
+print(f"Updated genres at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Conditional Update
+
+Query first, then update based on conditions.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { filter, field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Find all out-of-stock products
+const outOfStock = await client.collection("products").query(
+  filter(field("quantity").eq(0))
+);
+
+// Update their status
+const updates = outOfStock.map(product => ({
+  _id: product._id,
+  in_stock: false,
+  status: "Out of Stock"
+}));
+
+if (updates.length > 0) {
+  const lsn = await client.collection("products").update(updates);
+  console.log(`Updated ${updates.length} products at LSN: ${lsn}`);
+}
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import filter, field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Find all out-of-stock products
+out_of_stock = client.collection("products").query(
+    filter(field("quantity").eq(0))
+)
+
+# Update their status
+updates = [
+    {
+        "_id": product["_id"],
+        "in_stock": False,
+        "status": "Out of Stock"
+    }
+    for product in out_of_stock
+]
+
+if len(updates) > 0:
+    lsn = client.collection("products").update(updates)
+    print(f"Updated {len(updates)} products at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Handling Empty Updates
+
+Check if any documents were actually updated.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Try to update a non-existent document (with default failOnMissing=false)
+const lsn = await client.collection("books").update([{
+  _id: "book_999", // Doesn't exist
+  price: 29.99
+}]);
+
+if (lsn === "") {
+  console.log("No documents were updated");
+} else {
+  console.log(`Updated at LSN: ${lsn}`);
+}
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Try to update a non-existent document (with default fail_on_missing=False)
+lsn = client.collection("books").update([{
+    "_id": "book_999",  # Doesn't exist
+    "price": 29.99
+}])
+
+if lsn == "":
+    print("No documents were updated")
+else:
+    print(f"Updated at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Bulk Status Update
+
+Update status fields for many documents.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Mark multiple orders as shipped
+const orderIds = ["order_1", "order_2", "order_3", "order_4"];
+
+const updates = orderIds.map(id => ({
+  _id: id,
+  status: "shipped",
+  shipped_at: new Date().toISOString()
+}));
+
+const lsn = await client.collection("orders").update(updates);
+console.log(`Marked ${orderIds.length} orders as shipped at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from datetime import datetime
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Mark multiple orders as shipped
+order_ids = ["order_1", "order_2", "order_3", "order_4"]
+
+updates = [
+    {
+        "_id": order_id,
+        "status": "shipped",
+        "shipped_at": datetime.now().isoformat()
+    }
+    for order_id in order_ids
+]
+
+lsn = client.collection("orders").update(updates)
+print(f"Marked {len(order_ids)} orders as shipped at LSN: {lsn}")
+```
+</CodeGroup>
+
+## Difference Between Update and Upsert
+
+<Warning>
+  Understanding the difference between `update()` and `upsert()` is crucial:
+  
+  - **`update()`**: Merges fields into existing documents. Missing documents are ignored (or cause an error if `failOnMissing=true`).
+  - **`upsert()`**: Replaces entire documents. Creates new documents if they don't exist.
+</Warning>
+
+<CodeGroup>
+```javascript JavaScript
+// Using update() - merges fields
+await client.collection("books").update([{
+  _id: "book_1",
+  price: 29.99
+}]);
+// Result: Only price is updated, other fields unchanged
+
+// Using upsert() - replaces document
+await client.collection("books").upsert([{
+  _id: "book_1",
+  price: 29.99
+}]);
+// Result: Document now only has _id and price, other fields removed
+```
+
+```python Python
+# Using update() - merges fields
+client.collection("books").update([{
+    "_id": "book_1",
+    "price": 29.99
+}])
+# Result: Only price is updated, other fields unchanged
+
+# Using upsert() - replaces document
+client.collection("books").upsert([{
+    "_id": "book_1",
+    "price": 29.99
+}])
+# Result: Document now only has _id and price, other fields removed
+```
+</CodeGroup>
+
+## Best Practices
+
+1. **Use Update for Partial Changes**: When you only need to modify specific fields, use `update()` instead of `upsert()` to preserve other document data.
+
+2. **Batch Updates**: Update multiple documents in a single call for better performance.
+
+3. **Check LSN**: An empty LSN string indicates that no documents were updated (all IDs were missing).
+
+4. **Use failOnMissing**: Set `failOnMissing=true` when you expect all documents to exist and want to catch errors early.
+
+5. **Validate IDs**: Ensure your `_id` values are correct before updating to avoid silently failing updates.
+
+6. **Update Vectors Carefully**: When updating vector embeddings, ensure the dimensions match your schema.
+
+## Related Methods
+
+- [`upsert()`](/documents/upsert) - Insert or completely replace documents
+- [`get()`](/documents/get) - Retrieve documents by their IDs
+- [`delete()`](/documents/delete) - Remove documents from the collection
+- [`query()`](/documents/query) - Search and filter documents

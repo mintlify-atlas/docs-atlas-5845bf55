@@ -1,0 +1,292 @@
+---
+title: "Consistency Levels"
+description: "Control data consistency in TopK queries for optimal performance and reliability"
+---
+
+## Overview
+
+TopK provides two consistency levels that let you balance between query performance and data freshness. Understanding these consistency models helps you optimize your application for specific use cases.
+
+## Consistency Levels
+
+TopK supports two consistency levels for read operations:
+
+<Tabs>
+  <Tab title="Indexed (Default)">
+    **Indexed consistency** returns results as soon as they are indexed, providing:
+    - Faster query performance
+    - Eventual consistency guarantees
+    - Ideal for read-heavy workloads where absolute freshness isn't critical
+
+    ```javascript
+    // Using indexed consistency (default)
+    const results = await client.collection("books").query(
+      filter(field("published_year").gte(2000)),
+      { consistency: "indexed" }
+    );
+    ```
+  </Tab>
+  <Tab title="Strong">
+    **Strong consistency** waits for all replicas to be consistent, providing:
+    - Guaranteed up-to-date results
+    - Higher latency due to coordination overhead
+    - Essential for write-then-read scenarios
+
+    ```javascript
+    // Using strong consistency
+    const results = await client.collection("books").query(
+      filter(field("published_year").gte(2000)),
+      { consistency: "strong" }
+    );
+    ```
+  </Tab>
+</Tabs>
+
+## Using LSN for Consistency
+
+TopK uses Log Sequence Numbers (LSN) to track the order of operations. Every write operation returns an LSN that you can use to ensure read-your-own-writes consistency.
+
+### How LSN Works
+
+When you perform a write operation (upsert, update, or delete), TopK returns an LSN representing that operation's position in the log:
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+    import { text } from "topk-js/schema";
+
+    const client = new Client({
+      apiKey: "YOUR_API_KEY",
+      region: "aws-us-east-1-elastica"
+    });
+
+    // Write operation returns an LSN
+    const lsn = await client.collection("books").upsert([
+      { _id: "1", title: "The Great Gatsby" },
+      { _id: "2", title: "1984" }
+    ]);
+
+    // Use LSN to ensure the query sees these writes
+    const count = await client.collection("books").count({ lsn });
+    console.log(count); // Guaranteed to be at least 2
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    from topk_sdk.schema import text
+
+    client = Client(
+      api_key="YOUR_API_KEY",
+      region="aws-us-east-1-elastica"
+    )
+
+    # Write operation returns an LSN
+    lsn = client.collection("books").upsert([
+      {"_id": "1", "title": "The Great Gatsby"},
+      {"_id": "2", "title": "1984"}
+    ])
+
+    # Use LSN to ensure the query sees these writes
+    count = client.collection("books").count(lsn=lsn)
+    print(count)  # Guaranteed to be at least 2
+    ```
+  </Tab>
+</Tabs>
+
+### Read-Your-Own-Writes Pattern
+
+The most common use case for LSN is ensuring that queries immediately see data you just wrote:
+
+<CodeGroup>
+```javascript Update and Query
+import { field, filter, select } from "topk-js/query";
+import { fn } from "topk-js/query";
+
+// Update a document's vector embedding
+const lsn = await client.collection("books").update(
+  [{ _id: "1984", summary_embedding: Array(16).fill(8.0) }],
+  true
+);
+
+// Query immediately with the updated data
+const results = await client.collection("books").query(
+  select({
+    dist: fn.vectorDistance("summary_embedding", Array(16).fill(2.0))
+  })
+    .filter(field("_id").eq("1984"))
+    .limit(1),
+  { lsn }
+);
+```
+
+```javascript Delete and Count
+import { field, filter } from "topk-js/query";
+
+// Delete documents
+const lsn = await client.collection("books").delete(["lotr"]);
+
+// Count immediately reflects the deletion
+const count = await client.collection("books").count({ lsn });
+```
+</CodeGroup>
+
+### Get Operations with LSN
+
+You can also use LSN with `get()` operations to ensure you're retrieving the latest version:
+
+```javascript
+const lsn = await client.collection("books").upsert([
+  { 
+    _id: "x", 
+    f32_vector: [1, 2, 3],
+    u8_vector: data.u8Vector([4, 5, 6]),
+    binary_vector: data.binaryVector([7, 8, 9])
+  }
+]);
+
+// Get with LSN ensures we see the upserted data
+const obj = await client.collection("books").get(["x"], null, { lsn });
+```
+
+## When to Use Each Consistency Level
+
+<AccordionGroup>
+  <Accordion title="Use Indexed Consistency" icon="gauge-high">
+    Choose indexed consistency when:
+    - You're running read-heavy analytics or search queries
+    - Slight data staleness (milliseconds) is acceptable
+    - You want to maximize query throughput
+    - You're not immediately querying data you just wrote
+    
+    <Info>
+      Indexed consistency typically provides sub-10ms latency for most queries.
+    </Info>
+  </Accordion>
+
+  <Accordion title="Use Strong Consistency" icon="shield-check">
+    Choose strong consistency when:
+    - You need guaranteed fresh data for every query
+    - You're implementing critical business logic
+    - You're running queries after user-initiated writes
+    - Data accuracy is more important than latency
+    
+    <Warning>
+      Strong consistency adds coordination overhead. Use LSN-based consistency for better performance in write-then-read scenarios.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Use LSN-Based Consistency" icon="clock">
+    Choose LSN-based consistency when:
+    - You need to query data immediately after writing it
+    - You want read-your-own-writes guarantees
+    - You're implementing optimistic UI updates
+    - You need point-in-time consistency without full strong consistency overhead
+    
+    <Tip>
+      LSN-based consistency provides the best balance: you get strong consistency for specific operations without the global coordination cost.
+    </Tip>
+  </Accordion>
+</AccordionGroup>
+
+## Performance Implications
+
+### Latency Comparison
+
+| Consistency Level | Typical Latency | Use Case |
+|-------------------|-----------------|----------|
+| Indexed (default) | 5-15ms | General queries, analytics |
+| LSN-based | 10-20ms | Write-then-read patterns |
+| Strong | 20-50ms | Critical data requirements |
+
+<Note>
+  Latency varies based on data size, query complexity, and geographic distribution.
+</Note>
+
+### Throughput Considerations
+
+- **Indexed consistency**: Highest throughput, queries can be served from any replica
+- **LSN-based consistency**: High throughput, waits only for specific LSN to be replicated
+- **Strong consistency**: Lower throughput, requires coordination across all replicas
+
+## Best Practices
+
+1. **Default to indexed consistency** for most queries unless you have specific freshness requirements.
+
+2. **Use LSN for write-then-read patterns** instead of strong consistency:
+   ```javascript
+   // ✅ Good: Use LSN
+   const lsn = await client.collection("books").upsert(docs);
+   const results = await client.collection("books").query(query, { lsn });
+   
+   // ❌ Less efficient: Use strong consistency
+   await client.collection("books").upsert(docs);
+   const results = await client.collection("books").query(query, { consistency: "strong" });
+   ```
+
+3. **Batch writes when possible** to minimize the number of LSN checks needed.
+
+4. **Monitor query performance** and adjust consistency levels based on your application's requirements.
+
+## QueryOptions Interface
+
+All read operations in TopK accept an optional `QueryOptions` parameter:
+
+```typescript
+interface QueryOptions {
+  /** Last sequence number to query at (for consistency) */
+  lsn?: string;
+  /** Consistency level for the query */
+  consistency?: ConsistencyLevel;
+}
+
+type ConsistencyLevel = "indexed" | "strong";
+```
+
+Operations that support `QueryOptions`:
+- `query()` - Execute queries with consistency control
+- `count()` - Count documents with consistency guarantees
+- `get()` - Retrieve documents with specific consistency requirements
+
+## Example: Building a Consistent Search Application
+
+```javascript
+import { Client } from "topk-js";
+import { text, int, f32Vector, vectorIndex, semanticIndex } from "topk-js/schema";
+import { field, filter, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: process.env.TOPK_API_KEY,
+  region: "aws-us-east-1-elastica"
+});
+
+// Create collection with indexes
+await client.collections().create("products", {
+  name: text().required().index(semanticIndex()),
+  price: int().required(),
+  embedding: f32Vector({ dimension: 768 }).index(vectorIndex({ metric: "cosine" }))
+});
+
+// User adds a new product
+const lsn = await client.collection("products").upsert([{
+  _id: "new-product",
+  name: "Wireless Headphones",
+  price: 199,
+  embedding: await generateEmbedding("Wireless Headphones")
+}]);
+
+// Immediately search for the product with LSN
+const results = await client.collection("products").query(
+  filter(field("name").contains("Wireless"))
+    .topk(fn.vectorDistance("embedding", queryVector), 10),
+  { lsn } // Ensures the new product appears in results
+);
+
+// Regular search queries use indexed consistency for speed
+const fastResults = await client.collection("products").query(
+  filter(field("price").lte(200))
+    .topk(fn.vectorDistance("embedding", queryVector), 10)
+  // No consistency option = defaults to "indexed"
+);
+```

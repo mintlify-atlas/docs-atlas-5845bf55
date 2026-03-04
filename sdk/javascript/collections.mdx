@@ -1,0 +1,238 @@
+---
+title: "Collections"
+description: "Client for managing collections in TopK"
+---
+
+## CollectionsClient
+
+Client for managing collections. This client provides methods to create, list, get, and delete collections.
+
+Get an instance of `CollectionsClient` by calling `client.collections()`:
+
+```javascript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+const collectionsClient = client.collections();
+```
+
+## Methods
+
+### list()
+
+Lists all collections in the current project.
+
+<CodeGroup>
+```javascript Example
+const collections = await client.collections().list();
+
+collections.forEach(collection => {
+  console.log(`Collection: ${collection.name}`);
+  console.log(`Region: ${collection.region}`);
+  console.log(`Schema:`, collection.schema);
+});
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<Array<Collection>>">
+  A promise that resolves to an array of Collection objects
+</ResponseField>
+
+### create(name, schema)
+
+Creates a new collection with the specified schema.
+
+<ParamField path="name" type="string" required>
+  Name of the collection to create
+</ParamField>
+
+<ParamField path="schema" type="Record<string, schema.FieldSpec>" required>
+  Schema definition for the collection fields
+</ParamField>
+
+<CodeGroup>
+```javascript Basic Schema
+import { text, int, semanticIndex } from "topk-js/schema";
+
+const collection = await client.collections().create("books", {
+  title: text().required().index(semanticIndex()),
+  author: text(),
+  published_year: int()
+});
+```
+
+```javascript Advanced Schema
+import { 
+  text, 
+  int, 
+  f32Vector, 
+  semanticIndex, 
+  vectorIndex 
+} from "topk-js/schema";
+
+const collection = await client.collections().create("books", {
+  title: text().required().index(semanticIndex()),
+  author: text(),
+  published_year: int(),
+  embedding: f32Vector({ dimension: 1536 }).index(
+    vectorIndex({ metric: "cosine" })
+  )
+});
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<Collection>">
+  A promise that resolves to the created Collection object
+</ResponseField>
+
+### get(name)
+
+Retrieves information about a specific collection.
+
+<ParamField path="name" type="string" required>
+  Name of the collection to retrieve
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+const collection = await client.collections().get("books");
+
+console.log(`Collection: ${collection.name}`);
+console.log(`Organization ID: ${collection.orgId}`);
+console.log(`Project ID: ${collection.projectId}`);
+console.log(`Region: ${collection.region}`);
+console.log(`Schema:`, collection.schema);
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<Collection>">
+  A promise that resolves to the Collection object
+</ResponseField>
+
+### delete(name)
+
+Deletes a collection and all its data.
+
+<Warning>
+  This operation is irreversible and will permanently delete all data in the collection.
+</Warning>
+
+<ParamField path="name" type="string" required>
+  Name of the collection to delete
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+await client.collections().delete("books");
+console.log("Collection deleted successfully");
+```
+</CodeGroup>
+
+<ResponseField name="return" type="Promise<void>">
+  A promise that resolves when the collection is deleted
+</ResponseField>
+
+## Collection
+
+Represents a collection in the TopK service. A collection is a container for documents with a defined schema.
+
+<ResponseField name="name" type="string">
+  Name of the collection
+</ResponseField>
+
+<ResponseField name="orgId" type="string">
+  Organization ID that owns the collection
+</ResponseField>
+
+<ResponseField name="projectId" type="string">
+  Project ID that contains the collection
+</ResponseField>
+
+<ResponseField name="schema" type="Record<string, CollectionFieldSpec>">
+  Schema definition for the collection fields
+</ResponseField>
+
+<ResponseField name="region" type="string">
+  Region where the collection is stored
+</ResponseField>
+
+## CollectionFieldSpec
+
+Represents a field specification within a collection schema. This struct defines the properties of a field in a collection, including its data type, whether it's required, and any index configuration.
+
+<ResponseField name="dataType" type="schema.DataType">
+  Data type of the field
+</ResponseField>
+
+<ResponseField name="required" type="boolean">
+  Whether the field is required (must be present in all documents)
+</ResponseField>
+
+<ResponseField name="index" type="schema.FieldIndexUnion">
+  Index configuration for the field (optional)
+</ResponseField>
+
+## Example: Complete Workflow
+
+<CodeGroup>
+```javascript Complete Example
+import { Client } from "topk-js";
+import { text, int, semanticIndex, keywordIndex } from "topk-js/schema";
+import { select, field, fn } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "YOUR_TOPK_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+// Create a collection
+await client.collections().create("books", {
+  title: text().required().index(semanticIndex()),
+  author: text().index(keywordIndex()),
+  published_year: int()
+});
+
+// List all collections
+const collections = await client.collections().list();
+console.log(`Total collections: ${collections.length}`);
+
+// Get collection details
+const booksCollection = await client.collections().get("books");
+console.log(`Books collection schema:`, booksCollection.schema);
+
+// Add documents to the collection
+await client.collection("books").upsert([
+  { 
+    _id: "gatsby", 
+    title: "The Great Gatsby", 
+    author: "F. Scott Fitzgerald",
+    published_year: 1925
+  },
+  { 
+    _id: "1984", 
+    title: "1984", 
+    author: "George Orwell",
+    published_year: 1949
+  }
+]);
+
+// Query the collection
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    author: field("author"),
+    similarity: fn.semanticSimilarity("title", "dystopian future")
+  })
+  .topk(field("similarity"), 10)
+);
+
+console.log("Search results:", results);
+
+// Delete the collection (use with caution!)
+await client.collections().delete("books");
+```
+</CodeGroup>

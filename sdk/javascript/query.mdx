@@ -1,0 +1,824 @@
+---
+title: "Query"
+description: "Query builder and expression functions for searching and filtering data"
+---
+
+## Overview
+
+The query module provides functions and classes to build queries for searching and filtering data in TopK collections. Import query functions from `topk-js/query`.
+
+```javascript
+import { 
+  select, 
+  filter, 
+  field, 
+  literal,
+  match,
+  fn 
+} from "topk-js/query";
+```
+
+## Query Building
+
+### select(exprs)
+
+Creates a new query with a select stage. The select stage defines which fields and computed values to return.
+
+<ParamField path="exprs" type="Record<string, LogicalExpression | FunctionExpression>" required>
+  A map of field names to expressions
+</ParamField>
+
+<CodeGroup>
+```javascript Basic Select
+import { select, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    author: field("author")
+  })
+);
+```
+
+```javascript With Function
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.semanticSimilarity("title", "classic novel")
+  })
+  .topk(field("similarity"), 10)
+);
+```
+</CodeGroup>
+
+### filter(expr)
+
+Creates a new query with a filter stage. The filter stage restricts which documents are returned.
+
+<ParamField path="expr" type="LogicalExpression | TextExpression" required>
+  The filter expression
+</ParamField>
+
+<CodeGroup>
+```javascript Basic Filter
+import { filter, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(field("published_year").gt(2000))
+);
+```
+
+```javascript Combined Filter
+import { filter, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(
+    field("published_year").gt(2000)
+    .and(field("price").lt(25))
+  )
+);
+```
+</CodeGroup>
+
+## Query Class
+
+A query object that represents a sequence of query stages. Queries are built by chaining together different stages like select, filter, topk, etc.
+
+### filter(expr)
+
+Adds a filter stage to the query.
+
+<ParamField path="expr" type="LogicalExpression | TextExpression" required>
+  The filter expression
+</ParamField>
+
+### select(exprs)
+
+Adds a select stage to the query.
+
+<ParamField path="exprs" type="Record<string, LogicalExpression | FunctionExpression>" required>
+  A map of field names to expressions
+</ParamField>
+
+### topk(expr, k, asc?)
+
+Adds a top-k stage to the query. Returns the top k documents based on the expression.
+
+<ParamField path="expr" type="LogicalExpression" required>
+  The expression to rank by
+</ParamField>
+
+<ParamField path="k" type="number" required>
+  The number of documents to return
+</ParamField>
+
+<ParamField path="asc" type="boolean">
+  Whether to sort in ascending order. Defaults to false (descending)
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.semanticSimilarity("title", "dystopian future")
+  })
+  .topk(field("similarity"), 10)
+);
+```
+</CodeGroup>
+
+### limit(k)
+
+Adds a limit stage to the query.
+
+<ParamField path="k" type="number" required>
+  The maximum number of documents to return
+</ParamField>
+
+### sort(expr, asc?)
+
+Adds a sort stage to the query.
+
+<ParamField path="expr" type="LogicalExpression" required>
+  The expression to sort by
+</ParamField>
+
+<ParamField path="asc" type="boolean">
+  Whether to sort in ascending order. Defaults to false (descending)
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { select, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    year: field("published_year")
+  })
+  .sort(field("published_year"), true)
+);
+```
+</CodeGroup>
+
+### count()
+
+Adds a count stage to the query.
+
+<CodeGroup>
+```javascript Example
+import { filter, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(field("published_year").gt(2000))
+  .count()
+);
+```
+</CodeGroup>
+
+### rerank(options?)
+
+Adds a rerank stage to the query.
+
+<ParamField path="options" type="RerankOptions">
+  Optional reranking configuration
+</ParamField>
+
+<ParamField path="options.model" type="string">
+  The reranking model to use
+</ParamField>
+
+<ParamField path="options.query" type="string">
+  The query text for reranking
+</ParamField>
+
+<ParamField path="options.fields" type="Array<string>">
+  Fields to include in reranking
+</ParamField>
+
+<ParamField path="options.topkMultiple" type="number">
+  Multiple of top-k to consider for reranking
+</ParamField>
+
+## Expression Functions
+
+### field(name)
+
+Creates a field reference expression.
+
+<ParamField path="name" type="string" required>
+  The name of the field to reference
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { field } from "topk-js/query";
+
+const titleField = field("title");
+const yearField = field("published_year");
+```
+</CodeGroup>
+
+### literal(value)
+
+Creates a literal value expression.
+
+<ParamField path="value" type="number | string | string[] | number[] | boolean | data.List" required>
+  The literal value
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { literal, field } from "topk-js/query";
+
+const expr = field("price").lt(literal(25.99));
+```
+</CodeGroup>
+
+### match(token, options?)
+
+Creates a text match expression for keyword search.
+
+<ParamField path="token" type="string" required>
+  The token to match
+</ParamField>
+
+<ParamField path="options" type="MatchOptions">
+  Optional matching configuration
+</ParamField>
+
+<ParamField path="options.field" type="string">
+  Field to match against
+</ParamField>
+
+<ParamField path="options.weight" type="number">
+  Weight for the match
+</ParamField>
+
+<ParamField path="options.all" type="boolean">
+  Whether to match all terms
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { match } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(match("science fiction", { field: "genre" }))
+);
+```
+</CodeGroup>
+
+### Utility Functions
+
+#### abs(expr)
+
+Creates an absolute value expression.
+
+<ParamField path="expr" type="LogicalExpression" required>
+  The expression to compute absolute value of
+</ParamField>
+
+#### all(exprs)
+
+Evaluates to true if each expression is true (logical AND).
+
+<ParamField path="exprs" type="Array<LogicalExpression>" required>
+  Array of expressions to evaluate
+</ParamField>
+
+#### any(exprs)
+
+Evaluates to true if at least one expression is true (logical OR).
+
+<ParamField path="exprs" type="Array<LogicalExpression>" required>
+  Array of expressions to evaluate
+</ParamField>
+
+#### min(left, right)
+
+Creates a MIN expression that returns the smaller of two values.
+
+<ParamField path="left" type="LogicalExpression | number | string" required>
+  First value
+</ParamField>
+
+<ParamField path="right" type="LogicalExpression | number | string" required>
+  Second value
+</ParamField>
+
+#### max(left, right)
+
+Creates a MAX expression that returns the larger of two values.
+
+<ParamField path="left" type="LogicalExpression | number | string" required>
+  First value
+</ParamField>
+
+<ParamField path="right" type="LogicalExpression | number | string" required>
+  Second value
+</ParamField>
+
+#### not(expr)
+
+Creates a logical NOT expression.
+
+<ParamField path="expr" type="LogicalExpression" required>
+  The expression to negate
+</ParamField>
+
+## LogicalExpression
+
+Represents a logical expression that can be used in queries. LogicalExpressions support method chaining for building complex queries.
+
+### Comparison Methods
+
+#### eq(other)
+
+Checks if the expression equals another value.
+
+<ParamField path="other" type="LogicalExpression | string | number | boolean | null" required>
+  The value to compare against
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { field } from "topk-js/query";
+
+const expr = field("author").eq("George Orwell");
+```
+</CodeGroup>
+
+#### ne(other)
+
+Checks if the expression does not equal another value.
+
+#### lt(other)
+
+Checks if the expression is less than another value.
+
+<ParamField path="other" type="LogicalExpression | number | string" required>
+  The value to compare against
+</ParamField>
+
+#### lte(other)
+
+Checks if the expression is less than or equal to another value.
+
+#### gt(other)
+
+Checks if the expression is greater than another value.
+
+#### gte(other)
+
+Checks if the expression is greater than or equal to another value.
+
+<CodeGroup>
+```javascript Comparison Examples
+import { field } from "topk-js/query";
+
+// Greater than
+const recentBooks = field("published_year").gt(2020);
+
+// Less than or equal
+const affordableBooks = field("price").lte(19.99);
+
+// Not equal
+const nonFiction = field("genre").ne("fiction");
+```
+</CodeGroup>
+
+### Logical Methods
+
+#### and(other)
+
+Computes the logical AND of the expression and another expression.
+
+<ParamField path="other" type="LogicalExpression | boolean" required>
+  The expression to AND with
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { field } from "topk-js/query";
+
+const expr = field("published_year").gt(2000)
+  .and(field("price").lt(25));
+```
+</CodeGroup>
+
+#### or(other)
+
+Computes the logical OR of the expression and another expression.
+
+<ParamField path="other" type="LogicalExpression | boolean" required>
+  The expression to OR with
+</ParamField>
+
+### Null Checks
+
+#### isNull()
+
+Checks if the expression evaluates to null.
+
+#### isNotNull()
+
+Checks if the expression evaluates to a non-null value.
+
+<CodeGroup>
+```javascript Example
+import { field } from "topk-js/query";
+
+const hasAuthor = field("author").isNotNull();
+```
+</CodeGroup>
+
+### Math Methods
+
+#### abs()
+
+Computes the absolute value of the expression.
+
+#### ln()
+
+Computes the natural logarithm of the expression.
+
+#### exp()
+
+Computes the exponential of the expression.
+
+#### sqrt()
+
+Computes the square root of the expression.
+
+#### square()
+
+Computes the square of the expression.
+
+#### add(other)
+
+Adds another value to the expression.
+
+#### sub(other)
+
+Subtracts another value from the expression.
+
+#### mul(other)
+
+Multiplies the expression by another value.
+
+#### div(other)
+
+Divides the expression by another value.
+
+#### min(other)
+
+Computes the minimum of the expression and another value.
+
+#### max(other)
+
+Computes the maximum of the expression and another value.
+
+<CodeGroup>
+```javascript Math Examples
+import { select, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    price: field("price"),
+    // 20% discount
+    discounted_price: field("price").mul(0.8),
+    // Rounded price
+    rounded_price: field("price").add(0.5).abs()
+  })
+);
+```
+</CodeGroup>
+
+### String Methods
+
+#### startsWith(other)
+
+Checks if the expression starts with another value. Can be applied to a string field or a list of strings field.
+
+<ParamField path="other" type="LogicalExpression | string" required>
+  The value to check for
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { filter, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(
+    field("title").startsWith("The")
+    .or(field("tags").startsWith("fiction"))
+  )
+);
+```
+</CodeGroup>
+
+#### contains(other)
+
+Checks if the expression contains another value.
+
+<ParamField path="other" type="LogicalExpression | string | number" required>
+  The value to check for
+</ParamField>
+
+#### in(other)
+
+Checks if the expression is in another value.
+
+<ParamField path="other" type="LogicalExpression | string | Array<string> | Array<number> | data.List" required>
+  The value or list to check against
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { filter, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(field("genre").in(["fiction", "fantasy", "sci-fi"]))
+);
+```
+</CodeGroup>
+
+### Keyword Search Methods
+
+#### matchAll(other)
+
+Checks if the expression matches all terms against the field with keyword index.
+
+<ParamField path="other" type="LogicalExpression | string | string[]" required>
+  The terms to match
+</ParamField>
+
+#### matchAny(other)
+
+Checks if the expression matches any term against the field with keyword index.
+
+<ParamField path="other" type="LogicalExpression | string | string[]" required>
+  The terms to match
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { filter, field } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(field("tags").matchAny(["fiction", "fantasy"]))
+);
+```
+</CodeGroup>
+
+### Other Methods
+
+#### coalesce(other)
+
+Coalesces nulls in the expression with another value.
+
+<ParamField path="other" type="LogicalExpression | number" required>
+  The value to use if the expression is null
+</ParamField>
+
+#### choose(x, y)
+
+Chooses between two values based on the expression.
+
+<ParamField path="x" type="LogicalExpression | string | number | boolean | null" required>
+  Value to return if expression is true
+</ParamField>
+
+<ParamField path="y" type="LogicalExpression | string | number | boolean | null" required>
+  Value to return if expression is false
+</ParamField>
+
+#### boost(condition, boost)
+
+Multiplies the scoring expression by the provided boost value if the condition is true. Otherwise, the scoring expression is unchanged (multiplied by 1).
+
+<ParamField path="condition" type="LogicalExpression | boolean" required>
+  The condition to check
+</ParamField>
+
+<ParamField path="boost" type="LogicalExpression | number" required>
+  The boost multiplier
+</ParamField>
+
+#### regexpMatch(pattern, flags?)
+
+Check if the expression matches the provided regexp pattern.
+
+<ParamField path="pattern" type="string" required>
+  The regular expression pattern
+</ParamField>
+
+<ParamField path="flags" type="string">
+  Optional regex flags
+</ParamField>
+
+## Function Expressions (fn)
+
+Function expressions compute special values like semantic similarity or vector distance. Import from `topk-js/query` as `fn`.
+
+```javascript
+import { fn } from "topk-js/query";
+```
+
+### fn.semanticSimilarity(field, query)
+
+Computes the semantic similarity between a field and a query string.
+
+<ParamField path="field" type="string" required>
+  The name of the field to search
+</ParamField>
+
+<ParamField path="query" type="string" required>
+  The query text
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    similarity: fn.semanticSimilarity("title", "classic American novel")
+  })
+  .topk(field("similarity"), 10)
+);
+```
+</CodeGroup>
+
+### fn.vectorDistance(field, query, options?)
+
+Computes the vector distance between a field and a query vector.
+
+<ParamField path="field" type="string" required>
+  The name of the vector field
+</ParamField>
+
+<ParamField path="query" type="Array<number> | Record<number, number> | data.List | data.SparseVector" required>
+  The query vector (dense or sparse)
+</ParamField>
+
+<ParamField path="options" type="VectorDistanceOptions">
+  Optional configuration
+</ParamField>
+
+<ParamField path="options.skipRefine" type="boolean">
+  Whether to skip refinement step
+</ParamField>
+
+<CodeGroup>
+```javascript Dense Vector
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    distance: fn.vectorDistance(
+      "title_embedding",
+      [0.1, 0.2, 0.3, /* ... */]
+    )
+  })
+  .topk(field("distance"), 10)
+);
+```
+
+```javascript Sparse Vector
+import { select, field, fn } from "topk-js/query";
+import { f32SparseVector } from "topk-js/data";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    distance: fn.vectorDistance(
+      "sparse_field",
+      f32SparseVector({0: 0.5, 10: 0.8, 25: 0.3})
+    )
+  })
+  .topk(field("distance"), 10)
+);
+```
+</CodeGroup>
+
+### fn.multiVectorDistance(field, query, candidates?)
+
+Calculates the multi-vector distance between a field and a query matrix.
+
+<ParamField path="field" type="string" required>
+  The name of the matrix field
+</ParamField>
+
+<ParamField path="query" type="Array<Array<number>> | data.Matrix" required>
+  The query matrix. Can be an array of number arrays (defaults to f32), or a Matrix instance
+</ParamField>
+
+<ParamField path="candidates" type="number">
+  Limits the number of candidate vectors considered during retrieval
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    distance: fn.multiVectorDistance(
+      "token_embeddings",
+      [
+        [0.1, 0.2, 0.3, /* ... */],
+        [0.4, 0.5, 0.6, /* ... */]
+      ],
+      100
+    )
+  })
+  .topk(field("distance"), 10)
+);
+```
+</CodeGroup>
+
+### fn.bm25Score()
+
+Computes the BM25 score for a keyword search.
+
+<CodeGroup>
+```javascript Example
+import { select, field, match, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(match("science fiction", { field: "description" }))
+  .select({
+    title: field("title"),
+    score: fn.bm25Score()
+  })
+  .topk(field("score"), 10)
+);
+```
+</CodeGroup>
+
+## Complete Query Examples
+
+<CodeGroup>
+```javascript Semantic Search
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    author: field("author"),
+    similarity: fn.semanticSimilarity("title", "dystopian future")
+  })
+  .topk(field("similarity"), 10)
+);
+```
+
+```javascript Filtered Search
+import { select, filter, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(
+    field("published_year").gt(2000)
+    .and(field("price").lt(30))
+  )
+  .select({
+    title: field("title"),
+    year: field("published_year"),
+    price: field("price"),
+    similarity: fn.semanticSimilarity("description", "adventure story")
+  })
+  .topk(field("similarity"), 5)
+);
+```
+
+```javascript Hybrid Search
+import { select, filter, field, match, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  filter(match("science fiction", { field: "genre" }))
+  .select({
+    title: field("title"),
+    keyword_score: fn.bm25Score(),
+    semantic_score: fn.semanticSimilarity("description", "space exploration")
+  })
+  .select({
+    title: field("title"),
+    // Combined score
+    score: field("keyword_score").mul(0.3).add(
+      field("semantic_score").mul(0.7)
+    )
+  })
+  .topk(field("score"), 10)
+);
+```
+</CodeGroup>

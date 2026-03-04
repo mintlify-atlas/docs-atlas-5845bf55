@@ -1,0 +1,620 @@
+---
+title: "Multi-Tenancy Patterns"
+description: "Implement secure and scalable multi-tenant search architectures with TopK"
+---
+
+## Overview
+
+Multi-tenancy is a software architecture where a single instance serves multiple customers (tenants) while keeping their data isolated. TopK provides flexible patterns for implementing multi-tenant search applications with strong data isolation and optimal performance.
+
+## Multi-Tenancy Strategies
+
+TopK supports three primary multi-tenancy approaches, each with different trade-offs:
+
+<CardGroup cols={3}>
+  <Card title="Collection per Tenant" icon="layer-group">
+    Strongest isolation with separate collections for each tenant
+  </Card>
+  <Card title="Field-Based Partitioning" icon="filter">
+    Shared collection with tenant ID filtering for better resource utilization
+  </Card>
+  <Card title="Hybrid Approach" icon="puzzle-piece">
+    Combine both strategies based on tenant size and requirements
+  </Card>
+</CardGroup>
+
+## Collection per Tenant
+
+The collection-per-tenant pattern creates a separate collection for each tenant, providing the strongest isolation guarantees.
+
+### Implementation
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript
+    import { Client } from "topk-js";
+    import { text, int, f32Vector, vectorIndex, semanticIndex } from "topk-js/schema";
+
+    const client = new Client({
+      apiKey: "YOUR_API_KEY",
+      region: "aws-us-east-1-elastica"
+    });
+
+    // Create a collection for a specific tenant
+    async function createTenantCollection(tenantId) {
+      const collectionName = `tenant_${tenantId}_documents`;
+      
+      await client.collections().create(collectionName, {
+        title: text().required().index(semanticIndex()),
+        content: text().required(),
+        category: text(),
+        created_at: int(),
+        embedding: f32Vector({ dimension: 768 }).index(
+          vectorIndex({ metric: "cosine" })
+        )
+      });
+      
+      return collectionName;
+    }
+
+    // Get tenant-specific collection
+    function getTenantCollection(tenantId) {
+      return client.collection(`tenant_${tenantId}_documents`);
+    }
+
+    // Insert tenant data
+    async function addDocuments(tenantId, documents) {
+      const collection = getTenantCollection(tenantId);
+      const lsn = await collection.upsert(documents);
+      return lsn;
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    from topk_sdk import Client
+    from topk_sdk.schema import text, int, f32_vector, vector_index, semantic_index
+
+    client = Client(
+      api_key="YOUR_API_KEY",
+      region="aws-us-east-1-elastica"
+    )
+
+    # Create a collection for a specific tenant
+    def create_tenant_collection(tenant_id):
+      collection_name = f"tenant_{tenant_id}_documents"
+      
+      client.collections().create(collection_name, {
+        "title": text().required().index(semantic_index()),
+        "content": text().required(),
+        "category": text(),
+        "created_at": int(),
+        "embedding": f32_vector(dimension=768).index(
+          vector_index(metric="cosine")
+        )
+      })
+      
+      return collection_name
+
+    # Get tenant-specific collection
+    def get_tenant_collection(tenant_id):
+      return client.collection(f"tenant_{tenant_id}_documents")
+
+    # Insert tenant data
+    def add_documents(tenant_id, documents):
+      collection = get_tenant_collection(tenant_id)
+      lsn = collection.upsert(documents)
+      return lsn
+    ```
+  </Tab>
+</Tabs>
+
+### Querying Tenant Data
+
+```javascript
+import { field, filter, fn } from "topk-js/query";
+
+async function searchTenantDocuments(tenantId, queryVector, filters = {}) {
+  const collection = getTenantCollection(tenantId);
+  
+  let query = filter(field("title").isNotNull())
+    .topk(fn.vectorDistance("embedding", queryVector), 20);
+  
+  // Apply additional filters if provided
+  if (filters.category) {
+    query = filter(
+      field("category").eq(filters.category)
+        .and(field("title").isNotNull())
+    ).topk(fn.vectorDistance("embedding", queryVector), 20);
+  }
+  
+  return await collection.query(query);
+}
+```
+
+### Advantages
+
+<AccordionGroup>
+  <Accordion title="Strong Isolation" icon="lock">
+    - Complete data separation between tenants
+    - Tenant data physically isolated
+    - Easy to backup or restore individual tenants
+    - Simplified compliance and audit trails
+  </Accordion>
+  
+  <Accordion title="Independent Scaling" icon="chart-line">
+    - Scale storage independently per tenant
+    - Optimize indexes for tenant-specific workloads
+    - Different schema versions per tenant if needed
+  </Accordion>
+  
+  <Accordion title="Operational Flexibility" icon="wrench">
+    - Delete tenant data by dropping collection
+    - Migrate tenants independently
+    - Apply tenant-specific optimizations
+  </Accordion>
+</AccordionGroup>
+
+### Considerations
+
+<Warning>
+  **Collection limits**: Consider the number of tenants and TopK's collection limits. This approach works best for up to thousands of tenants.
+</Warning>
+
+<Info>
+  **Management overhead**: More collections mean more management. Use infrastructure-as-code to automate collection creation and maintenance.
+</Info>
+
+## Field-Based Partitioning
+
+Field-based partitioning stores all tenant data in a shared collection with a `tenant_id` field, using query filters to isolate tenant data.
+
+### Implementation
+
+```javascript
+import { Client } from "topk-js";
+import { text, int, f32Vector, vectorIndex, semanticIndex } from "topk-js/schema";
+
+const client = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+// Create a shared multi-tenant collection
+await client.collections().create("shared_documents", {
+  tenant_id: text().required(),  // Tenant identifier
+  title: text().required().index(semanticIndex()),
+  content: text().required(),
+  category: text(),
+  created_at: int(),
+  embedding: f32Vector({ dimension: 768 }).index(
+    vectorIndex({ metric: "cosine" })
+  )
+});
+
+// Insert documents with tenant_id
+async function addTenantDocuments(tenantId, documents) {
+  // Add tenant_id to each document
+  const tenantDocs = documents.map(doc => ({
+    ...doc,
+    tenant_id: tenantId
+  }));
+  
+  const lsn = await client.collection("shared_documents").upsert(tenantDocs);
+  return lsn;
+}
+```
+
+### Querying with Tenant Isolation
+
+Always filter by `tenant_id` to ensure data isolation:
+
+<CodeGroup>
+```javascript Vector Search
+import { field, filter, fn } from "topk-js/query";
+
+async function searchDocuments(tenantId, queryVector, limit = 20) {
+  const results = await client.collection("shared_documents").query(
+    filter(field("tenant_id").eq(tenantId))
+      .topk(fn.vectorDistance("embedding", queryVector), limit)
+  );
+  
+  return results;
+}
+```
+
+```javascript Semantic Search
+import { field, filter, fn } from "topk-js/query";
+
+async function semanticSearch(tenantId, query, limit = 20) {
+  const results = await client.collection("shared_documents").query(
+    filter(field("tenant_id").eq(tenantId))
+      .topk(fn.semanticSimilarity("title", query), limit)
+  );
+  
+  return results;
+}
+```
+
+```javascript Filtered Search
+import { field, filter, fn, select } from "topk-js/query";
+
+async function filteredSearch(tenantId, category, queryVector) {
+  const results = await client.collection("shared_documents").query(
+    filter(
+      field("tenant_id").eq(tenantId)
+        .and(field("category").eq(category))
+    )
+      .topk(fn.vectorDistance("embedding", queryVector), 20)
+  );
+  
+  return results;
+}
+```
+</CodeGroup>
+
+### Tenant Data Operations
+
+```javascript
+import { field } from "topk-js/query";
+
+// Count documents for a tenant
+async function countTenantDocuments(tenantId) {
+  const count = await client.collection("shared_documents").count();
+  // Note: count with filter requires query
+  const results = await client.collection("shared_documents").query(
+    filter(field("tenant_id").eq(tenantId)).count()
+  );
+  return results.length;
+}
+
+// Delete all documents for a tenant
+async function deleteTenantData(tenantId) {
+  const lsn = await client.collection("shared_documents").delete(
+    field("tenant_id").eq(tenantId)
+  );
+  return lsn;
+}
+
+// Get specific documents for a tenant
+async function getTenantDocuments(tenantId, documentIds) {
+  const allDocs = await client.collection("shared_documents").get(documentIds);
+  
+  // Filter to ensure tenant_id matches (security layer)
+  const tenantDocs = Object.entries(allDocs)
+    .filter(([id, doc]) => doc.tenant_id === tenantId)
+    .reduce((acc, [id, doc]) => ({ ...acc, [id]: doc }), {});
+  
+  return tenantDocs;
+}
+```
+
+### Advantages
+
+<AccordionGroup>
+  <Accordion title="Resource Efficiency" icon="memory">
+    - Single collection for all tenants
+    - Shared indexes and resources
+    - Lower operational overhead
+    - Cost-effective for large numbers of small tenants
+  </Accordion>
+  
+  <Accordion title="Simplified Management" icon="list-check">
+    - Single schema to maintain
+    - Easier to implement cross-tenant analytics
+    - Simplified backup and restore processes
+  </Accordion>
+  
+  <Accordion title="Scalability" icon="rocket">
+    - Supports unlimited tenants
+    - No collection limits to worry about
+    - Easier to onboard new tenants
+  </Accordion>
+</AccordionGroup>
+
+### Security Considerations
+
+<Warning>
+  **Critical**: Always filter by `tenant_id` in every query to prevent data leaks between tenants.
+</Warning>
+
+```javascript
+// ✅ Secure: Always filter by tenant_id
+async function secureQuery(tenantId, filters) {
+  return await client.collection("shared_documents").query(
+    filter(
+      field("tenant_id").eq(tenantId)
+        .and(field("published_year").gte(2000))
+    ).limit(100)
+  );
+}
+
+// ❌ Insecure: Missing tenant_id filter
+async function insecureQuery(filters) {
+  return await client.collection("shared_documents").query(
+    filter(field("published_year").gte(2000)).limit(100)
+  );
+}
+```
+
+### Best Practices
+
+1. **Implement middleware** to automatically inject `tenant_id` filters:
+
+```javascript
+class TenantAwareClient {
+  constructor(client, tenantId) {
+    this.client = client;
+    this.tenantId = tenantId;
+  }
+  
+  collection(name) {
+    return new TenantAwareCollection(
+      this.client.collection(name),
+      this.tenantId
+    );
+  }
+}
+
+class TenantAwareCollection {
+  constructor(collection, tenantId) {
+    this.collection = collection;
+    this.tenantId = tenantId;
+  }
+  
+  async query(query) {
+    // Automatically inject tenant_id filter
+    const tenantQuery = filter(
+      field("tenant_id").eq(this.tenantId)
+    ).and(query);
+    
+    return await this.collection.query(tenantQuery);
+  }
+  
+  async upsert(documents) {
+    // Automatically add tenant_id to documents
+    const tenantDocs = documents.map(doc => ({
+      ...doc,
+      tenant_id: this.tenantId
+    }));
+    
+    return await this.collection.upsert(tenantDocs);
+  }
+}
+```
+
+2. **Use consistent naming** for the tenant ID field across your application.
+
+3. **Index the tenant_id field** for optimal query performance (text fields are indexed by default).
+
+4. **Monitor query patterns** to ensure tenant_id filters are always applied.
+
+## Hybrid Approach
+
+Combine both strategies for optimal flexibility:
+
+```javascript
+class MultiTenantManager {
+  constructor(client) {
+    this.client = client;
+    this.largeTenantsCollection = new Map(); // Tenants with dedicated collections
+    this.sharedCollection = "shared_documents"; // Small tenants share this
+  }
+  
+  async getTenantCollection(tenantId, tenantSize) {
+    // Large tenants get dedicated collections
+    if (tenantSize === "large") {
+      if (!this.largeTenantsCollection.has(tenantId)) {
+        const collectionName = `tenant_${tenantId}_documents`;
+        await this.createDedicatedCollection(collectionName);
+        this.largeTenantsCollection.set(tenantId, collectionName);
+      }
+      return this.client.collection(this.largeTenantsCollection.get(tenantId));
+    }
+    
+    // Small tenants use shared collection
+    return new TenantAwareCollection(
+      this.client.collection(this.sharedCollection),
+      tenantId
+    );
+  }
+  
+  async createDedicatedCollection(collectionName) {
+    await this.client.collections().create(collectionName, {
+      title: text().required().index(semanticIndex()),
+      content: text().required(),
+      embedding: f32Vector({ dimension: 768 }).index(
+        vectorIndex({ metric: "cosine" })
+      )
+    });
+  }
+}
+```
+
+### When to Use Hybrid
+
+<AccordionGroup>
+  <Accordion title="Variable Tenant Sizes" icon="scale-balanced">
+    Use dedicated collections for large enterprise customers and shared collections for small businesses.
+  </Accordion>
+  
+  <Accordion title="Performance Tiers" icon="gauge-high">
+    Offer premium customers dedicated infrastructure while maintaining cost-effectiveness for standard tiers.
+  </Accordion>
+  
+  <Accordion title="Gradual Migration" icon="arrows-turn-right">
+    Start tenants in shared collections and promote them to dedicated collections as they grow.
+  </Accordion>
+</AccordionGroup>
+
+## Comparison Table
+
+| Aspect | Collection per Tenant | Field-Based Partitioning | Hybrid |
+|--------|----------------------|-------------------------|--------|
+| **Isolation** | Strongest | Moderate (query-level) | Variable |
+| **Scalability** | Limited by collection count | Unlimited tenants | Best of both |
+| **Performance** | Optimal per tenant | Shared resources | Optimized per tier |
+| **Complexity** | Medium | Low | High |
+| **Cost** | Higher | Lower | Optimized |
+| **Best For** | Enterprise customers | SaaS with many small tenants | Variable tenant sizes |
+
+## Complete Example: SaaS Document Search
+
+```javascript
+import { Client } from "topk-js";
+import { text, int, f32Vector, vectorIndex, semanticIndex, keywordIndex } from "topk-js/schema";
+import { field, filter, fn, select } from "topk-js/query";
+
+class DocumentSearchService {
+  constructor(apiKey, region) {
+    this.client = new Client({ apiKey, region });
+    this.collectionName = "saas_documents";
+  }
+  
+  async initialize() {
+    // Create shared multi-tenant collection
+    await this.client.collections().create(this.collectionName, {
+      tenant_id: text().required(),
+      user_id: text().required(),
+      title: text().required().index(semanticIndex()),
+      content: text().required().index(keywordIndex()),
+      tags: text(),
+      created_at: int().required(),
+      updated_at: int(),
+      embedding: f32Vector({ dimension: 768 }).index(
+        vectorIndex({ metric: "cosine" })
+      )
+    });
+  }
+  
+  async addDocument(tenantId, userId, document) {
+    const doc = {
+      ...document,
+      tenant_id: tenantId,
+      user_id: userId,
+      created_at: Date.now()
+    };
+    
+    const lsn = await this.client.collection(this.collectionName).upsert([doc]);
+    return lsn;
+  }
+  
+  async search(tenantId, query, options = {}) {
+    const { limit = 20, userId = null, tags = null } = options;
+    
+    // Build filter with tenant isolation
+    let filterExpr = field("tenant_id").eq(tenantId);
+    
+    // Optionally filter by user
+    if (userId) {
+      filterExpr = filterExpr.and(field("user_id").eq(userId));
+    }
+    
+    // Optionally filter by tags
+    if (tags) {
+      filterExpr = filterExpr.and(field("tags").contains(tags));
+    }
+    
+    const results = await this.client.collection(this.collectionName).query(
+      filter(filterExpr)
+        .topk(fn.semanticSimilarity("content", query), limit)
+    );
+    
+    return results;
+  }
+  
+  async deleteUserDocuments(tenantId, userId) {
+    const lsn = await this.client.collection(this.collectionName).delete(
+      field("tenant_id").eq(tenantId).and(field("user_id").eq(userId))
+    );
+    return lsn;
+  }
+  
+  async deleteTenant(tenantId) {
+    const lsn = await this.client.collection(this.collectionName).delete(
+      field("tenant_id").eq(tenantId)
+    );
+    return lsn;
+  }
+}
+
+// Usage
+const service = new DocumentSearchService(
+  process.env.TOPK_API_KEY,
+  "aws-us-east-1-elastica"
+);
+
+await service.initialize();
+
+// Tenant A adds documents
+await service.addDocument("tenant_a", "user_123", {
+  _id: "doc_1",
+  title: "Product Requirements",
+  content: "Detailed specifications for the new feature...",
+  tags: "engineering",
+  embedding: await generateEmbedding("Product Requirements")
+});
+
+// Tenant A searches their documents
+const results = await service.search("tenant_a", "feature specifications", {
+  limit: 10,
+  tags: "engineering"
+});
+
+// Results only contain tenant_a's documents
+```
+
+## Monitoring and Observability
+
+<Tip>
+  Implement logging and monitoring to track tenant-specific usage patterns:
+  - Query latency per tenant
+  - Document count per tenant
+  - Storage usage per tenant
+  - Failed query attempts (potential security issues)
+</Tip>
+
+```javascript
+class MonitoredTenantCollection {
+  constructor(collection, tenantId, logger) {
+    this.collection = collection;
+    this.tenantId = tenantId;
+    this.logger = logger;
+  }
+  
+  async query(query, options) {
+    const startTime = Date.now();
+    
+    try {
+      const results = await this.collection.query(query, options);
+      
+      this.logger.info({
+        event: "tenant_query",
+        tenant_id: this.tenantId,
+        duration_ms: Date.now() - startTime,
+        result_count: results.length
+      });
+      
+      return results;
+    } catch (error) {
+      this.logger.error({
+        event: "tenant_query_error",
+        tenant_id: this.tenantId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Consistency Levels" icon="clock" href="/advanced/consistency">
+    Learn how to ensure data consistency in multi-tenant environments
+  </Card>
+  <Card title="Query Documentation" icon="magnifying-glass" href="/documents/query">
+    Explore advanced query patterns and filtering
+  </Card>
+</CardGroup>

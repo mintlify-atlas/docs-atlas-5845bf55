@@ -1,0 +1,486 @@
+---
+title: "Delete Documents"
+description: "Remove documents from a TopK collection by IDs or filter expressions"
+---
+
+## Overview
+
+The `delete()` method removes documents from a collection. You can delete documents either by specifying their IDs directly or by using a filter expression to match documents based on their field values.
+
+<Warning>
+  Document deletion is permanent and cannot be undone. Make sure you have backups or can recreate deleted data if needed.
+</Warning>
+
+## Method Signature
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    delete(
+      expr: Array<string> | LogicalExpression
+    ): Promise<string>
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    def delete(
+        expr: Union[Sequence[str], LogicalExpr]
+    ) -> str:
+        """Delete documents by their IDs or using a filter expression."""
+    ```
+  </Tab>
+</Tabs>
+
+## Parameters
+
+<ParamField path="expr" type="Array<string> | LogicalExpression" required>
+  Either:
+  - An array of document IDs to delete
+  - A logical expression that matches documents to delete
+</ParamField>
+
+## Returns
+
+<ResponseField name="lsn" type="string">
+  The Log Sequence Number (LSN) at which the deletion was applied.
+</ResponseField>
+
+## Examples
+
+### Delete by IDs
+
+Delete specific documents by their IDs.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Delete multiple documents by ID
+const lsn = await client.collection("books").delete([
+  "book_1",
+  "book_2",
+  "book_3"
+]);
+
+console.log(`Deleted at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Delete multiple documents by ID
+lsn = client.collection("books").delete([
+    "book_1",
+    "book_2",
+    "book_3"
+])
+
+print(f"Deleted at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Delete by Filter Expression
+
+Delete documents matching specific criteria.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Delete all books published before 1950
+const lsn = await client.collection("books").delete(
+  field("published_year").lt(1950)
+);
+
+console.log(`Deleted old books at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Delete all books published before 1950
+lsn = client.collection("books").delete(
+    field("published_year").lt(1950)
+)
+
+print(f"Deleted old books at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Delete with Complex Filters
+
+Use complex logical expressions to target specific documents.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Delete products that are out of stock AND have price > 100
+const lsn = await client.collection("products").delete(
+  field("in_stock").eq(false)
+    .and(field("price").gt(100))
+);
+
+console.log(`Deleted expensive out-of-stock products at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Delete products that are out of stock AND have price > 100
+lsn = client.collection("products").delete(
+    field("in_stock").eq(False)
+    .and_(field("price").gt(100))
+)
+
+print(f"Deleted expensive out-of-stock products at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Delete by Field Value
+
+Delete documents based on a single field value.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Delete all books by a specific author
+const lsn = await client.collection("books").delete(
+  field("author").eq("Ernest Hemingway")
+);
+
+console.log(`Deleted books by Ernest Hemingway at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Delete all books by a specific author
+lsn = client.collection("books").delete(
+    field("author").eq("Ernest Hemingway")
+)
+
+print(f"Deleted books by Ernest Hemingway at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Delete by Range
+
+Delete documents within a specific range of values.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Delete books published between 1990 and 2000
+const lsn = await client.collection("books").delete(
+  field("published_year").gte(1990)
+    .and(field("published_year").lte(2000))
+);
+
+console.log(`Deleted books from 1990s at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Delete books published between 1990 and 2000
+lsn = client.collection("books").delete(
+    field("published_year").gte(1990)
+    .and_(field("published_year").lte(2000))
+)
+
+print(f"Deleted books from 1990s at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Delete by List Membership
+
+Delete documents where a field contains specific values.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Delete all books in specific categories
+const lsn = await client.collection("books").delete(
+  field("category").in(["outdated", "removed", "discontinued"])
+);
+
+console.log(`Deleted books in removed categories at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Delete all books in specific categories
+lsn = client.collection("books").delete(
+    field("category").in_(["outdated", "removed", "discontinued"])
+)
+
+print(f"Deleted books in removed categories at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Delete with String Matching
+
+Delete documents based on string patterns.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Delete all temporary or draft entries
+const lsn = await client.collection("articles").delete(
+  field("title").startsWith("DRAFT:")
+    .or(field("title").startsWith("TEMP:"))
+);
+
+console.log(`Deleted draft articles at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Delete all temporary or draft entries
+lsn = client.collection("articles").delete(
+    field("title").starts_with("DRAFT:")
+    .or_(field("title").starts_with("TEMP:"))
+)
+
+print(f"Deleted draft articles at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Delete with Null Checks
+
+Delete documents where fields are null or missing.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// Delete all products without a price
+const lsn = await client.collection("products").delete(
+  field("price").isNull()
+);
+
+console.log(`Deleted products without prices at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# Delete all products without a price
+lsn = client.collection("products").delete(
+    field("price").is_null()
+)
+
+print(f"Deleted products without prices at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Conditional Delete with Query Preview
+
+Query first to see what will be deleted, then delete.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+import { filter, field } from "topk-js/query";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+// First, preview what will be deleted
+const condition = field("published_year").lt(1900);
+const toDelete = await client.collection("books").query(
+  filter(condition).limit(100)
+);
+
+console.log(`Found ${toDelete.length} books to delete`);
+
+// Confirm before deleting
+if (toDelete.length > 0) {
+  const lsn = await client.collection("books").delete(condition);
+  console.log(`Deleted ${toDelete.length} books at LSN: ${lsn}`);
+}
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.query import filter, field
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+# First, preview what will be deleted
+condition = field("published_year").lt(1900)
+to_delete = client.collection("books").query(
+    filter(condition).limit(100)
+)
+
+print(f"Found {len(to_delete)} books to delete")
+
+# Confirm before deleting
+if len(to_delete) > 0:
+    lsn = client.collection("books").delete(condition)
+    print(f"Deleted {len(to_delete)} books at LSN: {lsn}")
+```
+</CodeGroup>
+
+### Delete Single Document
+
+Delete a single document by its ID.
+
+<CodeGroup>
+```javascript JavaScript
+import { Client } from "topk-js";
+
+const client = new Client({
+  apiKey: "your-api-key",
+  region: "us-east-1"
+});
+
+const lsn = await client.collection("books").delete(["book_1"]);
+console.log(`Deleted book_1 at LSN: ${lsn}`);
+```
+
+```python Python
+from topk_sdk import Client
+
+client = Client(
+    api_key="your-api-key",
+    region="us-east-1"
+)
+
+lsn = client.collection("books").delete(["book_1"])
+print(f"Deleted book_1 at LSN: {lsn}")
+```
+</CodeGroup>
+
+## Best Practices
+
+1. **Query Before Delete**: When using filter expressions, query first to preview what will be deleted, especially for broad filters.
+
+2. **Use Specific Filters**: Make your filter expressions as specific as possible to avoid accidentally deleting the wrong documents.
+
+3. **Backup Important Data**: Before performing large delete operations, ensure you have backups or can recreate the data.
+
+4. **Batch by IDs**: When deleting specific documents, use ID-based deletion with an array of IDs for better performance and precision.
+
+5. **Monitor LSN**: Store the returned LSN if you need to track when deletions occurred or ensure consistency in subsequent operations.
+
+6. **Test Filters**: Test your filter expressions on a development collection before running them on production data.
+
+## Performance Considerations
+
+- **ID-based deletion** is faster than filter-based deletion for small numbers of specific documents.
+- **Filter-based deletion** is more efficient when removing many documents matching a pattern.
+- Large delete operations may take time to complete. Consider breaking them into smaller batches if needed.
+
+## Related Methods
+
+- [`upsert()`](/documents/upsert) - Insert or update documents
+- [`update()`](/documents/update) - Update existing documents
+- [`get()`](/documents/get) - Retrieve documents by IDs
+- [`query()`](/documents/query) - Search and filter documents

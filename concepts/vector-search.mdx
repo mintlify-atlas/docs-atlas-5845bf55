@@ -1,0 +1,373 @@
+---
+title: Vector Search
+description: Search using custom embeddings and vector similarity
+---
+
+Vector search allows you to search documents using custom embedding vectors. Unlike semantic search where TopK generates embeddings for you, with vector search you provide your own embeddings and TopK handles the efficient similarity computation.
+
+## Overview
+
+With vector search, you can:
+- Use embeddings from any model or source
+- Search using dense vectors with various precision levels
+- Choose from multiple distance metrics
+- Optimize storage with different vector types (f32, f16, f8, u8, i8, binary)
+
+## Schema Setup
+
+To enable vector search, define a vector field with a `vectorIndex()`:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { Client } from "topk-js";
+import { f32Vector, vectorIndex, text } from "topk-js/schema";
+
+const client = new Client({
+  apiKey: "YOUR_API_KEY",
+  region: "aws-us-east-1-elastica"
+});
+
+await client.collections().create("books", {
+  title: text(),
+  embedding: f32Vector({ dimension: 1536 }).index(
+    vectorIndex({ metric: "cosine" })
+  )
+});
+```
+
+```python Python
+from topk_sdk import Client
+from topk_sdk.schema import f32_vector, vector_index, text
+
+client = Client(
+  api_key="YOUR_API_KEY",
+  region="aws-us-east-1-elastica"
+)
+
+client.collections().create("books", schema={
+  "title": text(),
+  "embedding": f32_vector(dimension=1536).index(
+    vector_index(metric="cosine")
+  )
+})
+```
+
+</CodeGroup>
+
+### Vector Types
+
+TopK supports multiple vector data types for different precision and storage requirements:
+
+- `f32Vector` - 32-bit floating point (standard precision)
+- `f16Vector` - 16-bit floating point (half precision)
+- `f8Vector` - 8-bit floating point
+- `u8Vector` - 8-bit unsigned integer
+- `i8Vector` - 8-bit signed integer
+- `binaryVector` - 1-bit binary vectors
+
+<CodeGroup>
+
+```javascript JavaScript
+import { f32Vector, f16Vector, u8Vector, binaryVector, vectorIndex } from "topk-js/schema";
+
+const schema = {
+  // Standard precision
+  embedding_f32: f32Vector({ dimension: 1536 }).index(
+    vectorIndex({ metric: "cosine" })
+  ),
+  
+  // Half precision - 50% storage savings
+  embedding_f16: f16Vector({ dimension: 1536 }).index(
+    vectorIndex({ metric: "cosine" })
+  ),
+  
+  // Quantized - 75% storage savings
+  embedding_u8: u8Vector({ dimension: 1536 }).index(
+    vectorIndex({ metric: "dot_product" })
+  ),
+  
+  // Binary - 96.875% storage savings
+  embedding_binary: binaryVector({ dimension: 1536 }).index(
+    vectorIndex({ metric: "hamming" })
+  )
+};
+```
+
+```python Python
+from topk_sdk.schema import (
+  f32_vector, f16_vector, u8_vector, binary_vector, vector_index
+)
+
+schema = {
+  # Standard precision
+  "embedding_f32": f32_vector(dimension=1536).index(
+    vector_index(metric="cosine")
+  ),
+  
+  # Half precision - 50% storage savings
+  "embedding_f16": f16_vector(dimension=1536).index(
+    vector_index(metric="cosine")
+  ),
+  
+  # Quantized - 75% storage savings
+  "embedding_u8": u8_vector(dimension=1536).index(
+    vector_index(metric="dot_product")
+  ),
+  
+  # Binary - 96.875% storage savings
+  "embedding_binary": binary_vector(dimension=1536).index(
+    vector_index(metric="hamming")
+  )
+}
+```
+
+</CodeGroup>
+
+### Distance Metrics
+
+Choose the appropriate distance metric for your use case:
+
+- `cosine` - Cosine similarity (dense vectors only)
+- `euclidean` - Euclidean distance (dense vectors only)
+- `dot_product` - Dot product (dense vectors)
+- `hamming` - Hamming distance (binary vectors only)
+
+<Note>
+The `hamming` metric is only supported for `binaryVector` type. Dense vectors support `cosine`, `euclidean`, and `dot_product`.
+</Note>
+
+## Inserting Documents with Vectors
+
+When inserting documents, provide the embedding vectors using the appropriate data constructor:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { f32Vector, u8Vector, binaryVector } from "topk-js/data";
+
+await client.collection("books").upsert([
+  {
+    _id: "gatsby",
+    title: "The Great Gatsby",
+    // F32 vectors can be plain arrays
+    embedding_f32: [0.1, 0.2, 0.3, /* ... 1536 dimensions */],
+    // U8 vectors need the constructor
+    embedding_u8: u8Vector([12, 45, 78, /* ... */]),
+    // Binary vectors need the constructor
+    embedding_binary: binaryVector([0, 1, 1, 0, /* ... */])
+  }
+]);
+```
+
+```python Python
+from topk_sdk.data import f32_vector, u8_vector, binary_vector
+
+client.collection("books").upsert([
+  {
+    "_id": "gatsby",
+    "title": "The Great Gatsby",
+    # F32 vectors can be plain lists
+    "embedding_f32": [0.1, 0.2, 0.3, # ... 1536 dimensions
+    ],
+    # U8 vectors need the constructor
+    "embedding_u8": u8_vector([12, 45, 78, # ...
+    ]),
+    # Binary vectors need the constructor
+    "embedding_binary": binary_vector([0, 1, 1, 0, # ...
+    ])
+  }
+])
+```
+
+</CodeGroup>
+
+## Querying with Vector Search
+
+Use `fn.vectorDistance()` to compute the distance between your query vector and indexed vectors:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+import { f32Vector } from "topk-js/data";
+
+// Generate your query embedding (example using hypothetical embedding function)
+const queryEmbedding = await generateEmbedding("classic American literature");
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    distance: fn.vectorDistance("embedding", queryEmbedding)
+  })
+  .topk(field("distance"), 10, true) // true for ascending (closest first)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+from topk_sdk.data import f32_vector
+
+# Generate your query embedding
+query_embedding = generate_embedding("classic American literature")
+
+results = client.collection("books").query(
+  select(
+    "title",
+    distance=fn.vector_distance("embedding", query_embedding)
+  )
+  .topk(field("distance"), 10, True)  # True for ascending (closest first)
+)
+```
+
+</CodeGroup>
+
+### Different Vector Types in Queries
+
+<CodeGroup>
+
+```javascript JavaScript
+import { f32Vector, u8Vector, binaryVector } from "topk-js/data";
+import { select, field, fn } from "topk-js/query";
+
+// F32 vector query
+const results1 = await client.collection("books").query(
+  select({
+    distance: fn.vectorDistance("embedding_f32", [0.1, 0.2, 0.3])
+  })
+  .topk(field("distance"), 10, true)
+);
+
+// U8 vector query
+const results2 = await client.collection("books").query(
+  select({
+    distance: fn.vectorDistance("embedding_u8", u8Vector([12, 45, 78]))
+  })
+  .topk(field("distance"), 10, true)
+);
+
+// Binary vector query
+const results3 = await client.collection("books").query(
+  select({
+    distance: fn.vectorDistance("embedding_binary", binaryVector([0, 1, 1, 0]))
+  })
+  .topk(field("distance"), 10, true)
+);
+```
+
+```python Python
+from topk_sdk.data import f32_vector, u8_vector, binary_vector
+from topk_sdk.query import select, field, fn
+
+# F32 vector query
+results1 = client.collection("books").query(
+  select(
+    distance=fn.vector_distance("embedding_f32", [0.1, 0.2, 0.3])
+  )
+  .topk(field("distance"), 10, True)
+)
+
+# U8 vector query
+results2 = client.collection("books").query(
+  select(
+    distance=fn.vector_distance("embedding_u8", u8_vector([12, 45, 78]))
+  )
+  .topk(field("distance"), 10, True)
+)
+
+# Binary vector query
+results3 = client.collection("books").query(
+  select(
+    distance=fn.vector_distance("embedding_binary", binary_vector([0, 1, 1, 0]))
+  )
+  .topk(field("distance"), 10, True)
+)
+```
+
+</CodeGroup>
+
+## Combining with Filters
+
+Filter your results before performing vector search:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, filter, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    title: field("title"),
+    distance: fn.vectorDistance("embedding", queryEmbedding)
+  })
+  .filter(field("published_year").gt(1950))
+  .topk(field("distance"), 10, true)
+);
+```
+
+```python Python
+from topk_sdk.query import select, filter, field, fn
+
+results = client.collection("books").query(
+  select(
+    "title",
+    distance=fn.vector_distance("embedding", query_embedding)
+  )
+  .filter(field("published_year") > 1950)
+  .topk(field("distance"), 10, True)
+)
+```
+
+</CodeGroup>
+
+## Skip Refine Option
+
+For very large result sets, you can skip the refinement step for better performance:
+
+<CodeGroup>
+
+```javascript JavaScript
+import { select, field, fn } from "topk-js/query";
+
+const results = await client.collection("books").query(
+  select({
+    distance: fn.vectorDistance(
+      "embedding", 
+      queryEmbedding,
+      { skipRefine: true }
+    )
+  })
+  .topk(field("distance"), 100, true)
+);
+```
+
+```python Python
+from topk_sdk.query import select, field, fn
+
+results = client.collection("books").query(
+  select(
+    distance=fn.vector_distance(
+      "embedding", 
+      query_embedding,
+      skip_refine=True
+    )
+  )
+  .topk(field("distance"), 100, True)
+)
+```
+
+</CodeGroup>
+
+<Warning>
+Skipping refinement may reduce accuracy but improves query performance. Use this option only when you need approximate results and performance is critical.
+</Warning>
+
+<Tip>
+Choose your vector type based on your accuracy and storage requirements. F32 provides maximum accuracy, while binary vectors provide maximum compression at the cost of some accuracy.
+</Tip>
+
+## Related Concepts
+
+- [Semantic Search](/concepts/semantic-search) - Automatic embedding generation
+- [Sparse Vector Search](/concepts/sparse-vector-search) - Search with sparse vectors
+- [Multi-Vector Search](/concepts/multi-vector-search) - Search with multiple vectors per document

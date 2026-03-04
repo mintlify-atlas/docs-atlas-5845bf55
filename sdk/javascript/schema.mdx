@@ -1,0 +1,572 @@
+---
+title: "Schema"
+description: "Schema types and field specifications for defining collection structure"
+---
+
+## Overview
+
+The schema module provides functions to define field types and indexes for TopK collections. Import schema functions from `topk-js/schema`.
+
+```javascript
+import { 
+  text, 
+  int, 
+  float, 
+  bool, 
+  bytes,
+  list,
+  f32Vector,
+  f16Vector,
+  f8Vector,
+  binaryVector,
+  matrix,
+  semanticIndex,
+  vectorIndex,
+  multiVectorIndex,
+  keywordIndex
+} from "topk-js/schema";
+```
+
+## FieldSpec
+
+Represents a field specification that can be used to define a field in a collection schema. All schema functions return a `FieldSpec` object.
+
+### Methods
+
+#### required()
+
+Marks the field as required. All fields are optional by default.
+
+<CodeGroup>
+```javascript Example
+import { text } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title: text().required()
+});
+```
+</CodeGroup>
+
+#### index(index)
+
+Creates an index on a field.
+
+<ParamField path="index" type="FieldIndex" required>
+  The index configuration to apply to the field
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { text, keywordIndex } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title: text().index(keywordIndex())
+});
+```
+</CodeGroup>
+
+## Scalar Field Types
+
+### text()
+
+Creates a FieldSpec for text values.
+
+<CodeGroup>
+```javascript Example
+import { text } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title: text(),
+  author: text().required()
+});
+```
+</CodeGroup>
+
+### int()
+
+Creates a FieldSpec for integer values.
+
+<CodeGroup>
+```javascript Example
+import { int } from "topk-js/schema";
+
+await client.collections().create("books", {
+  published_year: int(),
+  page_count: int()
+});
+```
+</CodeGroup>
+
+### float()
+
+Creates a FieldSpec for floating-point values.
+
+<CodeGroup>
+```javascript Example
+import { float } from "topk-js/schema";
+
+await client.collections().create("books", {
+  price: float(),
+  rating: float()
+});
+```
+</CodeGroup>
+
+### bool()
+
+Creates a FieldSpec for boolean values.
+
+<CodeGroup>
+```javascript Example
+import { bool } from "topk-js/schema";
+
+await client.collections().create("books", {
+  is_published: bool(),
+  in_stock: bool()
+});
+```
+</CodeGroup>
+
+### bytes()
+
+Creates a FieldSpec for binary data.
+
+<CodeGroup>
+```javascript Example
+import { bytes } from "topk-js/schema";
+
+await client.collections().create("books", {
+  cover_image: bytes(),
+  thumbnail: bytes()
+});
+```
+</CodeGroup>
+
+## List Field Type
+
+### list(options)
+
+Creates a FieldSpec for list values.
+
+<ParamField path="options" type="ListOptions" required>
+  Configuration options for the list field
+</ParamField>
+
+<ParamField path="options.valueType" type="ListValueType" required>
+  The type of values the list can contain. Can be:
+  - `'text'`
+  - `'integer'`
+  - `'float'`
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { list } from "topk-js/schema";
+
+await client.collections().create("books", {
+  tags: list({ valueType: "text" }),
+  chapter_lengths: list({ valueType: "integer" }),
+  ratings: list({ valueType: "float" })
+});
+```
+</CodeGroup>
+
+## Vector Field Types
+
+### f32Vector(options)
+
+Creates a FieldSpec for 32-bit float vector values.
+
+<ParamField path="options" type="VectorOptions" required>
+  Configuration options for the vector field
+</ParamField>
+
+<ParamField path="options.dimension" type="number" required>
+  The dimension of the vector
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f32Vector } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title_embedding: f32Vector({ dimension: 1536 })
+});
+```
+</CodeGroup>
+
+### f16Vector(options)
+
+Creates a FieldSpec for 16-bit float vector values.
+
+<ParamField path="options" type="VectorOptions" required>
+  Configuration options for the vector field
+</ParamField>
+
+<ParamField path="options.dimension" type="number" required>
+  The dimension of the vector
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f16Vector } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title_embedding: f16Vector({ dimension: 1536 })
+});
+```
+</CodeGroup>
+
+### f8Vector(options)
+
+Creates a FieldSpec for 8-bit float vector values.
+
+<ParamField path="options" type="VectorOptions" required>
+  Configuration options for the vector field
+</ParamField>
+
+<ParamField path="options.dimension" type="number" required>
+  The dimension of the vector
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f8Vector } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title_embedding: f8Vector({ dimension: 1536 })
+});
+```
+</CodeGroup>
+
+### binaryVector(options)
+
+Creates a FieldSpec for binary vector values.
+
+<ParamField path="options" type="VectorOptions" required>
+  Configuration options for the vector field
+</ParamField>
+
+<ParamField path="options.dimension" type="number" required>
+  The dimension of the vector
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { binaryVector } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title_embedding: binaryVector({ dimension: 128 })
+});
+```
+</CodeGroup>
+
+### u8Vector(options)
+
+Creates a FieldSpec for 8-bit unsigned integer vector values.
+
+<ParamField path="options" type="VectorOptions" required>
+  Configuration options for the vector field
+</ParamField>
+
+<ParamField path="options.dimension" type="number" required>
+  The dimension of the vector
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { u8Vector } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title_embedding: u8Vector({ dimension: 1536 })
+});
+```
+</CodeGroup>
+
+### i8Vector(options)
+
+Creates a FieldSpec for 8-bit signed integer vector values.
+
+<ParamField path="options" type="VectorOptions" required>
+  Configuration options for the vector field
+</ParamField>
+
+<ParamField path="options.dimension" type="number" required>
+  The dimension of the vector
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { i8Vector } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title_embedding: i8Vector({ dimension: 1536 })
+});
+```
+</CodeGroup>
+
+## Sparse Vector Field Types
+
+### f32SparseVector()
+
+Creates a FieldSpec for 32-bit float sparse vector values.
+
+<Note>
+  Sparse vectors use u32 dimension indices to support dictionaries of up to 2^32 - 1 terms.
+</Note>
+
+<CodeGroup>
+```javascript Example
+import { f32SparseVector } from "topk-js/schema";
+
+await client.collections().create("books", {
+  sparse_field: f32SparseVector()
+});
+```
+</CodeGroup>
+
+### u8SparseVector()
+
+Creates a FieldSpec for 8-bit unsigned integer sparse vector values.
+
+<Note>
+  Sparse vectors use u32 dimension indices to support dictionaries of up to 2^32 - 1 terms.
+</Note>
+
+<CodeGroup>
+```javascript Example
+import { u8SparseVector } from "topk-js/schema";
+
+await client.collections().create("books", {
+  sparse_field: u8SparseVector()
+});
+```
+</CodeGroup>
+
+## Matrix Field Type
+
+### matrix(options)
+
+Creates a FieldSpec for matrix values.
+
+<ParamField path="options" type="MatrixOptions" required>
+  Configuration options for the matrix field
+</ParamField>
+
+<ParamField path="options.dimension" type="number" required>
+  The dimension (number of columns) of the matrix
+</ParamField>
+
+<ParamField path="options.valueType" type="MatrixValueType" required>
+  The value type of the matrix elements. Can be:
+  - `'f32'` - 32-bit float
+  - `'f16'` - 16-bit float
+  - `'f8'` - 8-bit float
+  - `'u8'` - 8-bit unsigned integer
+  - `'i8'` - 8-bit signed integer
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { matrix } from "topk-js/schema";
+
+await client.collections().create("books", {
+  token_embeddings: matrix({ dimension: 768, valueType: "f32" })
+});
+```
+</CodeGroup>
+
+## Index Types
+
+### semanticIndex(options?)
+
+Creates a FieldIndex for semantic search. This index automatically generates embeddings from text fields and enables semantic similarity search.
+
+<ParamField path="options" type="SemanticIndexOptions">
+  Optional configuration for the semantic index
+</ParamField>
+
+<ParamField path="options.model" type="string">
+  Embedding model to use for semantic search. Currently supported:
+  - `cohere/embed-english-v3`
+  - `cohere/embed-multilingual-v3`
+  - `cohere/embed-v4` (default)
+</ParamField>
+
+<ParamField path="options.embeddingType" type="EmbeddingDataType">
+  TopK supports the following embedding types for Cohere models:
+  - `'float32'`
+  - `'uint8'`
+  - `'binary'`
+</ParamField>
+
+<CodeGroup>
+```javascript Default Model
+import { text, semanticIndex } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title: text().index(semanticIndex())
+});
+```
+
+```javascript Custom Model
+import { text, semanticIndex } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title: text().index(semanticIndex({ 
+    model: "cohere/embed-v4",
+    embeddingType: "float32"
+  }))
+});
+```
+</CodeGroup>
+
+### vectorIndex(options)
+
+Creates a FieldIndex for vector similarity search.
+
+<ParamField path="options" type="VectorIndexOptions" required>
+  Configuration options for the vector index
+</ParamField>
+
+<ParamField path="options.metric" type="VectorDistanceMetric" required>
+  The distance metric to use for vector similarity. Can be:
+  - `'cosine'` (not supported for sparse vectors)
+  - `'euclidean'` (not supported for sparse vectors)
+  - `'dot_product'` (supported for dense and sparse vectors)
+  - `'hamming'` (only supported for binary_vector type)
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { f32Vector, vectorIndex } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title_embedding: f32Vector({ dimension: 1536 }).index(
+    vectorIndex({ metric: "cosine" })
+  )
+});
+```
+
+```javascript Sparse Vector
+import { f32SparseVector, vectorIndex } from "topk-js/schema";
+
+await client.collections().create("books", {
+  sparse_embedding: f32SparseVector().index(
+    vectorIndex({ metric: "dot_product" })
+  )
+});
+```
+</CodeGroup>
+
+### multiVectorIndex(options)
+
+Creates a FieldIndex for multi-vector similarity search.
+
+<ParamField path="options" type="MultiVectorIndexOptions" required>
+  Configuration options for the multi-vector index
+</ParamField>
+
+<ParamField path="options.metric" type="MultiVectorDistanceMetric" required>
+  The distance metric to use for multi-vector similarity. Currently supported:
+  - `'maxsim'`
+</ParamField>
+
+<ParamField path="options.sketchBits" type="number">
+  Number of bits to use for multi-vector sketch
+</ParamField>
+
+<ParamField path="options.quantization" type="MultiVectorQuantization">
+  The quantization to use for multi-vector values. Can be:
+  - `'1bit'`
+  - `'2bit'`
+  - `'scalar'`
+</ParamField>
+
+<CodeGroup>
+```javascript Example
+import { matrix, multiVectorIndex } from "topk-js/schema";
+
+await client.collections().create("books", {
+  token_embeddings: matrix({ dimension: 768, valueType: "f32" }).index(
+    multiVectorIndex({ metric: "maxsim" })
+  )
+});
+```
+
+```javascript With Options
+import { matrix, multiVectorIndex } from "topk-js/schema";
+
+await client.collections().create("books", {
+  token_embeddings: matrix({ dimension: 768, valueType: "f32" }).index(
+    multiVectorIndex({ 
+      metric: "maxsim",
+      sketchBits: 128,
+      quantization: "2bit"
+    })
+  )
+});
+```
+</CodeGroup>
+
+### keywordIndex()
+
+Creates a FieldIndex for keyword search. This index enables full-text search on text fields.
+
+<CodeGroup>
+```javascript Example
+import { text, keywordIndex } from "topk-js/schema";
+
+await client.collections().create("books", {
+  title: text().index(keywordIndex()),
+  description: text().index(keywordIndex())
+});
+```
+</CodeGroup>
+
+## Complete Schema Example
+
+<CodeGroup>
+```javascript Comprehensive Schema
+import { 
+  text, 
+  int, 
+  float, 
+  bool,
+  list,
+  f32Vector,
+  matrix,
+  semanticIndex,
+  vectorIndex,
+  multiVectorIndex,
+  keywordIndex
+} from "topk-js/schema";
+
+await client.collections().create("books", {
+  // Required text field with semantic search
+  title: text().required().index(semanticIndex()),
+  
+  // Text field with keyword search
+  description: text().index(keywordIndex()),
+  
+  // Scalar fields
+  author: text(),
+  published_year: int(),
+  price: float(),
+  in_stock: bool(),
+  
+  // List field
+  tags: list({ valueType: "text" }),
+  
+  // Dense vector with cosine similarity
+  title_embedding: f32Vector({ dimension: 1536 }).index(
+    vectorIndex({ metric: "cosine" })
+  ),
+  
+  // Matrix for multi-vector search
+  token_embeddings: matrix({ dimension: 768, valueType: "f32" }).index(
+    multiVectorIndex({ metric: "maxsim" })
+  )
+});
+```
+</CodeGroup>

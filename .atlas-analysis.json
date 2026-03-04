@@ -1,0 +1,145 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "TopK",
+  "projectDescription": "A high-performance search engine for the AI era with hybrid search capabilities combining keyword, semantic, and vector search.",
+  "theme": "aspen",
+  "primaryColor": "#f04e04",
+  "lightColor": "#56230c",
+  "darkColor": "#0c0c13",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart",
+              "regions"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/semantic-search",
+              "concepts/vector-search",
+              "concepts/multi-vector-search",
+              "concepts/keyword-search",
+              "concepts/sparse-vector-search",
+              "concepts/true-hybrid-search",
+              "concepts/reranking"
+            ]
+          },
+          {
+            "group": "Collections",
+            "pages": [
+              "collections/create",
+              "collections/list",
+              "collections/get",
+              "collections/delete"
+            ]
+          },
+          {
+            "group": "Documents",
+            "pages": [
+              "documents/upsert",
+              "documents/query",
+              "documents/get",
+              "documents/delete",
+              "documents/update"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/consistency",
+              "advanced/multi-tenancy"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Python SDK",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": [
+              "sdk/python/client",
+              "sdk/python/collections",
+              "sdk/python/schema",
+              "sdk/python/query",
+              "sdk/python/data"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "JavaScript SDK",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": [
+              "sdk/javascript/client",
+              "sdk/javascript/collections",
+              "sdk/javascript/schema",
+              "sdk/javascript/query",
+              "sdk/javascript/data"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Hybrid search combining keyword, semantic, and vector search",
+    "Automatic embeddings via semantic_index()",
+    "BM25 keyword search with filtering",
+    "Multi-vector and sparse vector search",
+    "Built-in reranking",
+    "Multi-tenancy support",
+    "Python and JavaScript SDKs"
+  ],
+  "publicApiSurface": [
+    "Client - Main client class for interacting with TopK",
+    "CollectionClient - Client for collection operations",
+    "CollectionsClient - Client for managing collections",
+    "schema.text() - Text field definition",
+    "schema.int() - Integer field definition",
+    "schema.float() - Float field definition",
+    "schema.bool() - Boolean field definition",
+    "schema.bytes() - Bytes field definition",
+    "schema.list() - List field definition",
+    "schema.f32Vector() - Float32 vector field",
+    "schema.f16Vector() - Float16 vector field",
+    "schema.f8Vector() - Float8 vector field",
+    "schema.binaryVector() - Binary vector field",
+    "schema.f32SparseVector() - Float32 sparse vector field",
+    "schema.u8SparseVector() - Uint8 sparse vector field",
+    "schema.matrix() - Matrix field definition",
+    "schema.semanticIndex() - Semantic search index",
+    "schema.vectorIndex() - Vector search index",
+    "schema.multiVectorIndex() - Multi-vector search index",
+    "schema.keywordIndex() - Keyword search index",
+    "query.select() - Create a select query",
+    "query.field() - Reference a field",
+    "query.filter() - Filter results",
+    "query.match() - Match text",
+    "query.literal() - Literal value",
+    "query.fn.semanticSimilarity() - Semantic similarity function",
+    "query.fn.vectorDistance() - Vector distance function",
+    "query.fn.multiVectorDistance() - Multi-vector distance function",
+    "query.fn.bm25Score() - BM25 score function",
+    "collection.upsert() - Insert or update documents",
+    "collection.update() - Update existing documents",
+    "collection.query() - Execute a query",
+    "collection.get() - Get documents by ID",
+    "collection.delete() - Delete documents",
+    "collection.count() - Count documents",
+    "collections.create() - Create a collection",
+    "collections.list() - List all collections",
+    "collections.get() - Get collection info",
+    "collections.delete() - Delete a collection"
+  ]
+}
